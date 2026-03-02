@@ -31,12 +31,15 @@ for the Visayas State University - Student Election Board.
 * Resolve lint warnings in sidebar.tsx and tooltip.tsx
 * Configure custom fonts in global.css and layout.tsx
 * Reconfigure fonts in globals.css
+
 *** Authentication and Pages
 * Create login page and add LoginCard component
 * Create LoginCard component
 * Create Dashboard page
+
 *** Infrastructure & UI Library
 * Install shadcn/ui component
+
 *** Supabase
 * Establish Supabase connections
 
