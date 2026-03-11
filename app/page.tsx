@@ -8,10 +8,20 @@ export default async function Home() {
   console.log("error:", error);
 
   return (
-    <main>
-      <h1>CLARO</h1>
-      <pre>{JSON.stringify(data, null, 2)}</pre>
-      {error && <p style={{ color: "red" }}>{error.message}</p>}
+    <main className="flex h-screen bg-[#FAFAFA]">
+      <div className="w-1/2 flex flex-col items-center justify-center">
+        <img
+          src="/logo.png"
+          alt="Logo"
+          className="w-120 h-50 object-contain mb-8"
+        />
+      </div>
+      <div className="w-1/2 flex items-center justify-center">
+        
+      </div>
+      <div>
+
+      </div>
     </main>
   );
 }
