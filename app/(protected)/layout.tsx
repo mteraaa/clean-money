@@ -7,8 +7,8 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider className="fixed h-screen">
-      <div className="flex h-screen">
+    <SidebarProvider className="fixed h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden">
         <AppSidebar />
         <main className="flex-1 p-6">{children}</main>
       </div>
