@@ -29,10 +29,19 @@ export const proxy = async (request: NextRequest) => {
   });
 
   // Refresh session if expired
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Protect /super-admin routes
+  if (request.nextUrl.pathname.startsWith("/super-admin")) {
+    if (user?.app_metadata?.role !== "super-admin") {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  }
 
   return supabaseResponse;
 };
+
+export const middleware = proxy;
 
 export const config = {
   matcher: [
