@@ -42,6 +42,8 @@ export default function AppSidebar() {
           <Link href="/reports">Reports</Link>
           <Link href="/activity-log">Activity Logs</Link>
           {isSuperAdmin && <Link href="/accounts">Accounts</Link>}
+          {isSuperAdmin && <Link href="/admin-controls">Admin Controls</Link>}
+          {isSuperAdmin && <Link href="/requests">Requests</Link>}
         </SidebarContent>
       </SidebarGroup>
       <SidebarFooter className="mt-auto mb-4">
