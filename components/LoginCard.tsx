@@ -16,7 +16,8 @@ import { createClient } from "@/utils/supabase/client";
 
 export default function LoginCard() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -30,7 +31,29 @@ export default function LoginCard() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    let loginEmail = identifier;
+
+    if (!identifier.includes("@")) {
+      const { data, error: lookupError } = await supabase
+        .from("users")
+        .select("email")
+        .eq("username", identifier)
+        .single();
+
+      if (lookupError || !data?.email) {
+        setError("No account found with that username.");
+        setLoading(false);
+        return;
+      }
+
+      loginEmail = data.email;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password,
+    });
 
     setLoading(false);
 
@@ -41,14 +64,16 @@ export default function LoginCard() {
     }
   }
 
-  async function handleForgotPassword(e: React.SyntheticEvent<HTMLFormElement>) {
+  async function handleForgotPassword(
+    e: React.SyntheticEvent<HTMLFormElement>,
+  ) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
 
@@ -80,26 +105,36 @@ export default function LoginCard() {
               type="email"
               placeholder="Email"
               className="font-inter mb-4"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
               required
             />
             {error && (
               <p className="font-inter text-sm text-red-600 mt-1">{error}</p>
             )}
             {success && (
-              <p className="font-inter text-sm text-green-600 mt-1">{success}</p>
+              <p className="font-inter text-sm text-green-600 mt-1">
+                {success}
+              </p>
             )}
           </CardContent>
           <CardFooter className="flex flex-col items-center gap-2">
-            <Button type="submit" className="w-full font-inter" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full font-inter"
+              disabled={loading}
+            >
               {loading ? "Sending..." : "Send Reset Link"}
             </Button>
             <Button
               variant="link"
               className="font-inter text-sm text-red-600"
               type="button"
-              onClick={() => { setForgotMode(false); setError(null); setSuccess(null); }}
+              onClick={() => {
+                setForgotMode(false);
+                setError(null);
+                setSuccess(null);
+              }}
             >
               Back to Login
             </Button>
@@ -119,16 +154,16 @@ export default function LoginCard() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent>
-          <Label className="font-inter block mb-4" htmlFor="email">
-            Email
+          <Label className="font-inter block mb-4" htmlFor="identifier">
+            Username / Email
           </Label>
           <Input
-            id="email"
-            type="email"
-            placeholder="Email"
+            id="identifier"
+            type="text"
+            placeholder="Username or Email"
             className="font-inter mb-4"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
           />
           <Label className="font-inter block mb-4" htmlFor="password">
@@ -148,14 +183,22 @@ export default function LoginCard() {
           )}
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2">
-          <Button type="submit" className="w-full font-inter" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full font-inter"
+            disabled={loading}
+          >
             {loading ? "Logging in..." : "Login"}
           </Button>
           <Button
             variant="link"
             className="font-inter text-sm text-red-600"
             type="button"
-            onClick={() => { setForgotMode(true); setError(null); setSuccess(null); }}
+            onClick={() => {
+              setForgotMode(true);
+              setError(null);
+              setSuccess(null);
+            }}
           >
             Forgot Password?
           </Button>
