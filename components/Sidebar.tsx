@@ -22,9 +22,7 @@ import {
   Archive,
   FileBarChart,
   ClipboardList,
-  Users,
   ShieldCheck,
-  Inbox,
   Settings,
 } from "lucide-react";
 import Link from "next/link";
@@ -87,21 +85,9 @@ export default function AppSidebar() {
           </Link>
           {isSuperAdmin && <SidebarSeparator className="mx-0 w-full" />}
           {isSuperAdmin && (
-            <Link href="/accounts" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Accounts
-            </Link>
-          )}
-          {isSuperAdmin && (
             <Link href="/admin-controls" className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4" />
               Admin Controls
-            </Link>
-          )}
-          {isSuperAdmin && (
-            <Link href="/requests" className="flex items-center gap-2">
-              <Inbox className="w-4 h-4" />
-              Requests
             </Link>
           )}
         </SidebarContent>
