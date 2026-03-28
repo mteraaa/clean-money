@@ -55,7 +55,7 @@ export default function AppSidebar() {
 
   return (
     <Sidebar
-      className="bg-[#f0f1f5] shadow-[4px_0px_8px_rgba(74,85,104,0.3)] overflow-hidden relative z-10"
+      className="shadow-[4px_0px_10px_0px_rgba(74,85,104,0.2)] overflow-hidden relative z-20"
       collapsible="none"
     >
       <SidebarHeader>
@@ -102,7 +102,7 @@ export default function AppSidebar() {
         </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-3 w-full rounded-lg p-2 hover:bg-accent transition-colors">
+            <button suppressHydrationWarning className="flex items-center gap-3 w-full rounded-lg p-2 hover:bg-accent transition-colors">
               <Avatar className="w-8 h-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                   {userName ? userName[0].toUpperCase() : "?"}
