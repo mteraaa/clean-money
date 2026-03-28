@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 type HeaderData = {
-  faculty_name: string;
+  org_name: string;
   year_label: string;
   semester_name: string;
 };
@@ -24,7 +24,7 @@ export default function Header() {
       const [{ data: userData }, { data: semesterData }] = await Promise.all([
         supabase
           .from("users")
-          .select("faculty_code")
+          .select("faculty_code, campus_code")
           .eq("auth_id", user.id)
           .single(),
         supabase
@@ -34,22 +34,32 @@ export default function Header() {
           .single(),
       ]);
 
-      if (!userData?.faculty_code) return;
-
-      const { data: facultyData } = await supabase
-        .from("faculty_seb")
-        .select("name")
-        .eq("code", userData.faculty_code)
-        .single();
-
       const ayRaw = semesterData?.academic_years;
       const academicYear = (Array.isArray(ayRaw) ? ayRaw[0] : ayRaw) as {
         year_label: string;
       } | null;
 
-      if (facultyData && semesterData && academicYear) {
+      let orgName = "";
+
+      if (userData?.faculty_code) {
+        const { data: facultyData } = await supabase
+          .from("faculty_seb")
+          .select("name")
+          .eq("faculty_code", userData.faculty_code)
+          .single();
+        orgName = facultyData?.name ?? "";
+      } else if (userData?.campus_code) {
+        const { data: campusData } = await supabase
+          .from("campus_seb")
+          .select("name")
+          .eq("campus_code", userData.campus_code)
+          .single();
+        orgName = campusData?.name ?? "";
+      }
+
+      if (orgName && semesterData && academicYear) {
         setData({
-          faculty_name: facultyData.name,
+          org_name: orgName,
           year_label: academicYear.year_label,
           semester_name: semesterData.semester_name,
         });
@@ -60,12 +70,12 @@ export default function Header() {
   return (
     <header className="bg-[#fafafa] px-10 py-8 shadow-[0px_4px_10px_0px_rgba(74,85,104,0.2)] relative z-10">
       <div className="flex items-baseline gap-3">
-        <span className="font-lexend font-bold text-xl tracking-wide uppercase">
-          {data?.faculty_name ?? ""}
+        <span className="font-lexend-exa font-bold text-xl tracking-wide uppercase">
+          {data?.org_name ?? ""}
         </span>
         {data && (
           <span className="text-gray-400 text-sm font-inter">
-            A.Y. {data.year_label} | {data.semester_name}
+            {data.year_label} | {data.semester_name}
           </span>
         )}
       </div>
