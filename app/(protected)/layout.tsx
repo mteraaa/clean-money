@@ -13,7 +13,7 @@ export default function ProtectedLayout({
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+          <main className="flex-1 overflow-auto p-6 bg-[#f3f4f6]">{children}</main>
         </div>
       </div>
     </SidebarProvider>

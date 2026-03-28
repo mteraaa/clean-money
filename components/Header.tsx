@@ -58,7 +58,7 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="bg-white border-b border-gray-200 px-10 py-8 shadow-sm">
+    <header className="bg-[#fafafa] px-10 py-8 shadow-[0px_4px_10px_0px_rgba(74,85,104,0.2)] relative z-10">
       <div className="flex items-baseline gap-3">
         <span className="font-lexend font-bold text-xl tracking-wide uppercase">
           {data?.faculty_name ?? ""}
