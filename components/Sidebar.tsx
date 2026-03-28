@@ -55,7 +55,7 @@ export default function AppSidebar() {
 
   return (
     <Sidebar
-      className="bg-[#f0f1f5] shadow-[4px_0px_8px_rgba(74,85,104,0.3)] overflow-hidden"
+      className="bg-[#f0f1f5] shadow-[4px_0px_8px_rgba(74,85,104,0.3)] overflow-hidden relative z-10"
       collapsible="none"
     >
       <SidebarHeader>
