@@ -1,10 +1,8 @@
 export default function ActivityLogPage() {
   return (
-    <div className="flex h-screen">
-      <main className="flex-1 p-6">
-        <h1 className="text-2xl font-bold mb-4">ActivityLog</h1>
-        {/* ActivityLog content goes here */}
-      </main>
+    <div className="bg-[#f3f4f6] min-h-full">
+      <h1 className="text-2xl font-bold mb-4">Activity Log</h1>
+      {/* ActivityLog content goes here */}
     </div>
   );
 }
