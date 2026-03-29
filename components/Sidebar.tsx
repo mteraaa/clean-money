@@ -77,7 +77,7 @@ export default function AppSidebar() {
           </Link>
           <Link
             href="/archives"
-            className={`flex items-center gap-2${pathname === "/archives" ? " font-bold" : ""}`}
+            className={`flex items-center gap-2${pathname.startsWith("/archives") ? " font-bold" : ""}`}
           >
             <Archive className="w-4 h-4" />
             Archives
