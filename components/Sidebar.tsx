@@ -27,11 +27,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 export default function AppSidebar() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -67,25 +68,40 @@ export default function AppSidebar() {
       </SidebarHeader>
       <SidebarGroup title="Main" className="font-inter ml-2">
         <SidebarContent>
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link
+            href="/dashboard"
+            className={`flex items-center gap-2${pathname === "/dashboard" ? " font-bold" : ""}`}
+          >
             <LayoutDashboard className="w-4 h-4" />
             Dashboard
           </Link>
-          <Link href="/archives" className="flex items-center gap-2">
+          <Link
+            href="/archives"
+            className={`flex items-center gap-2${pathname.startsWith("/archives") ? " font-bold" : ""}`}
+          >
             <Archive className="w-4 h-4" />
             Archives
           </Link>
-          <Link href="/reports" className="flex items-center gap-2">
+          <Link
+            href="/reports"
+            className={`flex items-center gap-2${pathname === "/reports" ? " font-bold" : ""}`}
+          >
             <FileBarChart className="w-4 h-4" />
             Reports
           </Link>
-          <Link href="/activity-log" className="flex items-center gap-2">
+          <Link
+            href="/activity-log"
+            className={`flex items-center gap-2${pathname === "/activity-log" ? " font-bold" : ""}`}
+          >
             <ClipboardList className="w-4 h-4" />
             Activity Logs
           </Link>
           {isSuperAdmin && <SidebarSeparator className="mx-0 w-full" />}
           {isSuperAdmin && (
-            <Link href="/admin-controls" className="flex items-center gap-2">
+            <Link
+              href="/admin-controls"
+              className={`flex items-center gap-2${pathname === "/admin-controls" ? " font-bold" : ""}`}
+            >
               <ShieldCheck className="w-4 h-4" />
               Admin Controls
             </Link>
@@ -94,7 +110,7 @@ export default function AppSidebar() {
       </SidebarGroup>
       <SidebarFooter className="mt-auto mb-4 px-2">
         <Link
-          className="font-inter text-sm px-2 py-1 hover:underline flex items-center gap-2"
+          className={`font-inter text-sm px-2 py-1 hover:underline flex items-center gap-2${pathname === "/settings" ? " font-bold" : ""}`}
           href="/settings"
         >
           <Settings className="w-4 h-4" />
@@ -102,7 +118,10 @@ export default function AppSidebar() {
         </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button suppressHydrationWarning className="flex items-center gap-3 w-full rounded-lg p-2 hover:bg-accent transition-colors">
+            <button
+              suppressHydrationWarning
+              className="flex items-center gap-3 w-full rounded-lg p-2 hover:bg-accent transition-colors"
+            >
               <Avatar className="w-8 h-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                   {userName ? userName[0].toUpperCase() : "?"}

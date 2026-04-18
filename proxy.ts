@@ -31,8 +31,21 @@ export const proxy = async (request: NextRequest) => {
   // Refresh session if expired
   const { data: { user } } = await supabase.auth.getUser();
 
+  const { pathname } = request.nextUrl;
+  const isPublicRoute = pathname === "/login" || pathname === "/";
+
+  // Redirect unauthenticated users to /login
+  if (!user && !isPublicRoute) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // Redirect authenticated users away from /login
+  if (user && pathname === "/login") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   // Protect /super-admin routes
-  if (request.nextUrl.pathname.startsWith("/super-admin")) {
+  if (pathname.startsWith("/super-admin")) {
     if (user?.app_metadata?.role !== "super-admin") {
       return NextResponse.redirect(new URL("/", request.url));
     }
