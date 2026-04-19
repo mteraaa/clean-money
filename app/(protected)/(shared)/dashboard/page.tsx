@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [balanceKey, setBalanceKey] = useState(0);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -82,6 +83,139 @@ export default function DashboardPage() {
     })();
   }, []);
 
+  async function handlePreview() {
+    if (!balance || !semesterId) return;
+    setPreviewLoading(true);
+    try {
+      const supabase = createClient();
+
+      const [{ data: semData }, { data: balData }, { data: incomeEntries }, { data: expenseEntries }] =
+        await Promise.all([
+          supabase
+            .from("semesters")
+            .select("semester_name, academic_years(year_label)")
+            .eq("id", semesterId)
+            .single(),
+          (() => {
+            let q = supabase
+              .from("balance_cards")
+              .select("initial_account_balance, initial_cash_on_hand, initial_cash_on_bank, cash_on_hand, cash_on_bank, collectibles");
+            if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
+            else q = q.eq("campus_code", balance.campus_code);
+            return q.single();
+          })(),
+          (() => {
+            let q = supabase
+              .from("entries")
+              .select("description, total_price")
+              .eq("semester_id", semesterId)
+              .eq("category", "income");
+            if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
+            else q = q.eq("campus_code", balance.campus_code);
+            return q;
+          })(),
+          (() => {
+            let q = supabase
+              .from("entries")
+              .select("total_price")
+              .eq("semester_id", semesterId)
+              .eq("category", "expense");
+            if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
+            else q = q.eq("campus_code", balance.campus_code);
+            return q;
+          })(),
+        ]);
+
+      // Org name
+      let orgName = "";
+      if (balance.faculty_code) {
+        const { data: fac } = await supabase
+          .from("faculty_seb")
+          .select("name")
+          .eq("faculty_code", balance.faculty_code)
+          .single();
+        if (fac) orgName = `${fac.name} - Student Election Board`;
+      } else if (balance.campus_code) {
+        const { data: cam } = await supabase
+          .from("campus_seb")
+          .select("name")
+          .eq("campus_code", balance.campus_code)
+          .single();
+        if (cam) orgName = `${cam.name} - Student Election Board`;
+      }
+
+      // Aggregate income
+      let membershipFee = 0, donations = 0, fines = 0, collectiblesIncome = 0, spRevenues = 0;
+      const othersMap: Record<string, number> = {};
+      for (const e of incomeEntries ?? []) {
+        const t = Number(e.total_price) || 0;
+        if (e.description === "Membership Fee") membershipFee += t;
+        else if (e.description === "Donations") donations += t;
+        else if (e.description === "Fines") fines += t;
+        else if (e.description === "Collectibles") collectiblesIncome += t;
+        else if (e.description === "Special Projects/Fund Raising") spRevenues += t;
+        else othersMap[e.description] = (othersMap[e.description] || 0) + t;
+      }
+      const others = Object.entries(othersMap).map(([label, amount]) => ({ label, amount }));
+
+      const totalExpenses = (expenseEntries ?? []).reduce((s, e) => s + (Number(e.total_price) || 0), 0);
+
+      const initialBal = Number(balData?.initial_account_balance) || 0;
+      const collectiblesB = Number(balData?.collectibles) || 0;
+      const totalContributions = membershipFee + donations + fines + collectiblesIncome +
+        others.reduce((s, o) => s + o.amount, 0) + spRevenues;
+      const totalFunds = initialBal + totalContributions + collectiblesB;
+      const netFundBalance = totalFunds - totalExpenses;
+
+      // Parse semester/year
+      const semName = (semData?.semester_name ?? "").replace(/\s*semester\s*/i, "").trim();
+      const yearLabel = (semData?.academic_years as { year_label?: string } | null)?.year_label ?? "";
+      const [y1, y2] = yearLabel.split("-");
+      const yearStart = (y1 ?? "").slice(-2);
+      const yearEnd = (y2 ?? "").slice(-2);
+
+      const { generateReport } = await import("@/utils/generateReport");
+      const blob = await generateReport({
+        semesterName: semName,
+        yearStart,
+        yearEnd,
+        orgName,
+        initialAccountBalance: initialBal,
+        initialCashOnHand: Number(balData?.initial_cash_on_hand) || 0,
+        initialCashOnBank: Number(balData?.initial_cash_on_bank) || 0,
+        membershipFee,
+        donations,
+        fines,
+        collectiblesIncome,
+        others: others.slice(0, 4),
+        specialProjectsRevenues: spRevenues,
+        collectiblesB,
+        totalFunds,
+        lessExpenses: totalExpenses,
+        netFundBalance,
+        cashOnHand: Number(balData?.cash_on_hand) || 0,
+        cashOnBank: Number(balData?.cash_on_bank) || 0,
+      });
+
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function refreshBalance() {
+    if (!balance) return;
+    const supabase = createClient();
+    let q = supabase.from("balance_cards").select("cash_on_bank, cash_on_hand, collectibles");
+    if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
+    else q = q.eq("campus_code", balance.campus_code);
+    const { data, error } = await q.single();
+    if (error) console.error("Balance fetch error:", error.message);
+    if (data) setBalance((prev) => prev ? { ...prev, ...data } : prev);
+    setBalanceKey((prev) => prev + 1);
+  }
+
   async function handleAdd(forms: FormState[]) {
     if (!semesterId || !balance) return;
     setAddSubmitting(true);
@@ -120,45 +254,7 @@ export default function DashboardPage() {
       if (error) { console.error("Insert error:", error.message); setAddSubmitting(false); return; }
     }
 
-    // Compute balance deltas
-    let handDelta = 0;
-    let collDelta = 0;
-    for (const f of forms) {
-      const total = (parseFloat(f.unit_price) || 0) * (parseInt(f.quantity) || 0);
-      if (f.category === "income") {
-        if (f.description_preset === "Collectibles") collDelta -= total;
-        handDelta += total;
-      } else {
-        handDelta -= total;
-      }
-    }
-
-    // Fetch current balance and apply deltas
-    let balFetchQuery = supabase
-      .from("balance_cards")
-      .select("cash_on_bank, cash_on_hand, collectibles");
-    if (balance.faculty_code) balFetchQuery = balFetchQuery.eq("faculty_code", balance.faculty_code);
-    else balFetchQuery = balFetchQuery.eq("campus_code", balance.campus_code);
-    const { data: currentBal } = await balFetchQuery.single();
-
-    if (currentBal) {
-      const newHand = currentBal.cash_on_hand + handDelta;
-      const newColl = currentBal.collectibles + collDelta;
-      const newBank = currentBal.cash_on_bank;
-
-      let balUpdateQuery = supabase.from("balance_cards").update({
-        cash_on_hand: newHand,
-        collectibles: newColl,
-        account_balance: newBank + newHand + newColl,
-      });
-      if (balance.faculty_code) balUpdateQuery = balUpdateQuery.eq("faculty_code", balance.faculty_code);
-      else balUpdateQuery = balUpdateQuery.eq("campus_code", balance.campus_code);
-      await balUpdateQuery;
-
-      setBalance((prev) => prev ? { ...prev, cash_on_hand: newHand, collectibles: newColl } : prev);
-      setBalanceKey((prev) => prev + 1);
-    }
-
+    await refreshBalance();
     setAddSheetOpen(false);
     const addedIncome = forms.filter((f) => f.category === "income").length;
     const addedExpense = forms.filter((f) => f.category === "expense").length;
@@ -172,7 +268,7 @@ export default function DashboardPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
-      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} />
+      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} onPreview={handlePreview} previewLoading={previewLoading} />
       {balance && (
         <>
           <BalanceCards
@@ -188,13 +284,13 @@ export default function DashboardPage() {
               facultyCode={balance.faculty_code}
               campusCode={balance.campus_code}
               refreshKey={refreshKey}
-              onMutation={() => setRefreshKey((prev) => prev + 1)}
+              onMutation={() => { setRefreshKey((prev) => prev + 1); refreshBalance(); }}
             />
             <IncomeEntriesTable
               facultyCode={balance.faculty_code}
               campusCode={balance.campus_code}
               refreshKey={refreshKey}
-              onMutation={() => setRefreshKey((prev) => prev + 1)}
+              onMutation={() => { setRefreshKey((prev) => prev + 1); refreshBalance(); }}
             />
           </div>
         </>
