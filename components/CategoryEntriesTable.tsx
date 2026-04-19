@@ -171,49 +171,12 @@ export default function CategoryEntriesTable({
     }
   }
 
-  async function updateBalance(deleted: Entry[]) {
-    let handDelta = 0;
-    let collDelta = 0;
-    for (const entry of deleted) {
-      const total = entry.unit_price * entry.quantity;
-      if (entry.category === "income") {
-        handDelta -= total;
-        if (entry.description === "Collectibles") collDelta += total;
-      } else {
-        handDelta += total;
-      }
-    }
-
-    const supabase = createClient();
-    let fetchQ = supabase.from("balance_cards").select("cash_on_bank, cash_on_hand, collectibles");
-    if (facultyCode) fetchQ = fetchQ.eq("faculty_code", facultyCode);
-    else fetchQ = fetchQ.eq("campus_code", campusCode);
-    const { data: bal } = await fetchQ.single();
-    if (!bal) return;
-
-    const newHand = bal.cash_on_hand + handDelta;
-    const newColl = bal.collectibles + collDelta;
-    let updateQ = supabase.from("balance_cards").update({
-      cash_on_hand: newHand,
-      collectibles: newColl,
-      account_balance: bal.cash_on_bank + newHand + newColl,
-    });
-    if (facultyCode) updateQ = updateQ.eq("faculty_code", facultyCode);
-    else updateQ = updateQ.eq("campus_code", campusCode);
-    await updateQ;
-  }
-
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
-    const toDelete = entries.filter((e) => selectedIds.has(e.id));
     const supabase = createClient();
     const { error } = await supabase.from("entries").delete().in("id", Array.from(selectedIds));
-    if (error) {
-      console.error("Bulk delete error:", error.message);
-      return;
-    }
+    if (error) { console.error("Bulk delete error:", error.message); return; }
 
-    await updateBalance(toDelete);
     setEntries((prev) => prev.filter((e) => !selectedIds.has(e.id)));
     setSelectedIds(new Set());
     setSelectMode(false);
@@ -221,16 +184,10 @@ export default function CategoryEntriesTable({
   }
 
   async function handleDelete(id: number) {
-    const toDelete = entries.find((e) => e.id === id);
-    if (!toDelete) return;
     const supabase = createClient();
     const { error } = await supabase.from("entries").delete().eq("id", id);
-    if (error) {
-      console.error("Delete error:", error.message);
-      return;
-    }
+    if (error) { console.error("Delete error:", error.message); return; }
 
-    await updateBalance([toDelete]);
     setEntries((prev) => prev.filter((e) => e.id !== id));
     onMutation?.();
   }

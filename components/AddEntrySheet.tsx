@@ -66,6 +66,7 @@ function EntryFormFields({
   onClearError: (key: string) => void;
   onRemove?: () => void;
 }) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const needsExtra =
     form.description_preset === "Others" ||
     (form.category === "expense" && form.description_preset === "Special Projects/Fund Raising");
@@ -127,7 +128,7 @@ function EntryFormFields({
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm text-gray-500">Date</label>
-        <Popover>
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
             <button className={`flex items-center justify-between border rounded-lg px-4 py-3 text-sm outline-none text-left ${errors.date ? "border-red-500" : "border-gray-200"}`}>
               <span className={form.date ? "text-gray-900" : "text-gray-400"}>
@@ -148,6 +149,7 @@ function EntryFormFields({
                   const m = String(date.getMonth() + 1).padStart(2, "0");
                   const d = String(date.getDate()).padStart(2, "0");
                   onChange({ ...form, date: `${y}-${m}-${d}` });
+                  setCalendarOpen(false);
                 }
               }}
             />
