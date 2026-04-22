@@ -10,28 +10,28 @@ import path from "path";
 const SZ = 9;
 const COLOR = rgb(0, 0, 0);
 const X_RIGHT = 468;
-const X_INDENT = 250;
+const X_INDENT = 240;
 const X_BREAKDOWN = 343;
-const X_OTHERS_LABEL = 120;
+const X_OTHERS_LABEL = 170;
 const Y = {
-  semester: 762,
-  orgName: 710,
-  beginBal: 704,
-  beginHand: 691,
-  beginBank: 678,
-  membership: 652,
-  donations: 638,
-  fines: 624,
-  collections: 610,
-  others: [596, 582, 568, 554] as const,
-  spRevenues: 525,
-  collectiblesB: 490,
-  totalFunds: 470,
-  lessExpenses: 450,
-  netBalance: 431,
-  bdHand: 403,
-  bdBank: 389,
-  bdCollectibles: 374,
+  semester: 734,
+  orgName: 708,
+  beginBal: 670,
+  beginHand: 657,
+  beginBank: 644,
+  membership: 617,
+  donations: 604,
+  fines: 591,
+  collections: 578,
+  others: [565, 552, 539, 525] as const,
+  spRevenues: 499,
+  collectiblesB: 472,
+  totalFunds: 459,
+  lessExpenses: 446,
+  netBalance: 433,
+  bdHand: 406,
+  bdBank: 393,
+  bdCollectibles: 380,
 };
 
 function fmt(n: number) {
@@ -175,12 +175,12 @@ export async function GET() {
     page.drawText(text, { x, y, size: SZ, font, color: COLOR });
   }
 
-  draw(semName, 80, Y.semester);
-  draw((y1 ?? "").slice(-2), 381, Y.semester);
-  draw((y2 ?? "").slice(-2), 432, Y.semester);
+  draw(semName, 248, Y.semester);
+  draw((y1 ?? "").slice(-2), 361, Y.semester);
+  draw((y2 ?? "").slice(-2), 406, Y.semester);
 
   const orgW = font.widthOfTextAtSize(orgName, SZ);
-  draw(orgName, (595 - orgW) / 2, Y.orgName);
+  draw(orgName, (618 - orgW) / 2, Y.orgName);
 
   draw(fmt(initialBal), X_RIGHT, Y.beginBal);
   draw(fmt(Number(bal?.initial_cash_on_hand) || 0), X_INDENT, Y.beginHand);
