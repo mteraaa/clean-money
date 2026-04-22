@@ -7,6 +7,7 @@ import WelcomeCard from "@/components/WelcomeCard";
 import IncomeEntriesTable from "@/components/IncomeEntriesTable";
 import ExpenseEntriesTable from "@/components/ExpenseEntriesTable";
 import AddEntrySheet, { FormState } from "@/components/AddEntrySheet";
+import PDFViewerCard from "@/components/PDFViewerCard";
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState<string>("");
@@ -24,7 +25,7 @@ export default function DashboardPage() {
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [balanceKey, setBalanceKey] = useState(0);
-  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -82,127 +83,6 @@ export default function DashboardPage() {
       setNextControlNumbers({ income: (incomeCount ?? 0) + 1, expense: (expenseCount ?? 0) + 1 });
     })();
   }, []);
-
-  async function handlePreview() {
-    if (!balance || !semesterId) return;
-    setPreviewLoading(true);
-    try {
-      const supabase = createClient();
-
-      const [{ data: semData }, { data: balData }, { data: incomeEntries }, { data: expenseEntries }] =
-        await Promise.all([
-          supabase
-            .from("semesters")
-            .select("semester_name, academic_years(year_label)")
-            .eq("id", semesterId)
-            .single(),
-          (() => {
-            let q = supabase
-              .from("balance_cards")
-              .select("initial_account_balance, initial_cash_on_hand, initial_cash_on_bank, cash_on_hand, cash_on_bank, collectibles");
-            if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
-            else q = q.eq("campus_code", balance.campus_code);
-            return q.single();
-          })(),
-          (() => {
-            let q = supabase
-              .from("entries")
-              .select("description, total_price")
-              .eq("semester_id", semesterId)
-              .eq("category", "income");
-            if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
-            else q = q.eq("campus_code", balance.campus_code);
-            return q;
-          })(),
-          (() => {
-            let q = supabase
-              .from("entries")
-              .select("total_price")
-              .eq("semester_id", semesterId)
-              .eq("category", "expense");
-            if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
-            else q = q.eq("campus_code", balance.campus_code);
-            return q;
-          })(),
-        ]);
-
-      // Org name
-      let orgName = "";
-      if (balance.faculty_code) {
-        const { data: fac } = await supabase
-          .from("faculty_seb")
-          .select("name")
-          .eq("faculty_code", balance.faculty_code)
-          .single();
-        if (fac) orgName = `${fac.name} - Student Election Board`;
-      } else if (balance.campus_code) {
-        const { data: cam } = await supabase
-          .from("campus_seb")
-          .select("name")
-          .eq("campus_code", balance.campus_code)
-          .single();
-        if (cam) orgName = `${cam.name} - Student Election Board`;
-      }
-
-      // Aggregate income
-      let membershipFee = 0, donations = 0, fines = 0, collectiblesIncome = 0, spRevenues = 0;
-      const othersMap: Record<string, number> = {};
-      for (const e of incomeEntries ?? []) {
-        const t = Number(e.total_price) || 0;
-        if (e.description === "Membership Fee") membershipFee += t;
-        else if (e.description === "Donations") donations += t;
-        else if (e.description === "Fines") fines += t;
-        else if (e.description === "Collectibles") collectiblesIncome += t;
-        else if (e.description === "Special Projects/Fund Raising") spRevenues += t;
-        else othersMap[e.description] = (othersMap[e.description] || 0) + t;
-      }
-      const others = Object.entries(othersMap).map(([label, amount]) => ({ label, amount }));
-
-      const totalExpenses = (expenseEntries ?? []).reduce((s, e) => s + (Number(e.total_price) || 0), 0);
-
-      const initialBal = Number(balData?.initial_account_balance) || 0;
-      const collectiblesB = Number(balData?.collectibles) || 0;
-      const totalContributions = membershipFee + donations + fines + collectiblesIncome +
-        others.reduce((s, o) => s + o.amount, 0) + spRevenues;
-      const totalFunds = initialBal + totalContributions + collectiblesB;
-      const netFundBalance = totalFunds - totalExpenses;
-
-      // Parse semester/year
-      const semName = (semData?.semester_name ?? "").replace(/\s*semester\s*/i, "").trim();
-      const yearLabel = (semData?.academic_years as { year_label?: string } | null)?.year_label ?? "";
-      const [y1, y2] = yearLabel.split("-");
-      const yearStart = (y1 ?? "").slice(-2);
-      const yearEnd = (y2 ?? "").slice(-2);
-
-      const { generateReport } = await import("@/utils/generateReport");
-      const blob = await generateReport({
-        semesterName: semName,
-        yearStart,
-        yearEnd,
-        orgName,
-        initialAccountBalance: initialBal,
-        initialCashOnHand: Number(balData?.initial_cash_on_hand) || 0,
-        initialCashOnBank: Number(balData?.initial_cash_on_bank) || 0,
-        membershipFee,
-        donations,
-        fines,
-        collectiblesIncome,
-        others: others.slice(0, 4),
-        specialProjectsRevenues: spRevenues,
-        collectiblesB,
-        totalFunds,
-        lessExpenses: totalExpenses,
-        netFundBalance,
-        cashOnHand: Number(balData?.cash_on_hand) || 0,
-        cashOnBank: Number(balData?.cash_on_bank) || 0,
-      });
-
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-    } finally {
-      setPreviewLoading(false);
-    }
-  }
 
   async function refreshBalance() {
     if (!balance) return;
@@ -268,7 +148,7 @@ export default function DashboardPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
-      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} onPreview={handlePreview} previewLoading={previewLoading} />
+      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} onPreview={() => setPreviewOpen(true)} />
       {balance && (
         <>
           <BalanceCards
@@ -295,6 +175,8 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+
+      <PDFViewerCard open={previewOpen} onClose={() => setPreviewOpen(false)} />
 
       <AddEntrySheet
         open={addSheetOpen}

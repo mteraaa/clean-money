@@ -2,10 +2,9 @@ type Props = {
   name: string;
   onAdd?: () => void;
   onPreview?: () => void;
-  previewLoading?: boolean;
 };
 
-export default function WelcomeCard({ name, onAdd, onPreview, previewLoading }: Props) {
+export default function WelcomeCard({ name, onAdd, onPreview }: Props) {
   return (
     <div className="bg-white rounded-xl shadow-md px-6 py-4 flex items-center justify-between font-lexend mb-4">
       <h1 className="text-lg font-semibold text-gray-900">
@@ -20,10 +19,9 @@ export default function WelcomeCard({ name, onAdd, onPreview, previewLoading }: 
         </button>
         <button
           onClick={onPreview}
-          disabled={previewLoading}
-          className="border border-gray-300 rounded-lg px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="border border-gray-300 rounded-lg px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         >
-          {previewLoading ? "Generating..." : "Preview"}
+          Preview
         </button>
         <button className="bg-gray-900 text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-gray-700 transition-colors">
           Publish
