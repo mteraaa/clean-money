@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Eye, EyeOff, Pencil, Check, X, ArrowDownToLine, TrendingUp } from "lucide-react";
+import { Eye, EyeOff, Plus, ArrowDownToLine, TrendingUp } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import {
   Dialog,
@@ -18,7 +18,7 @@ type BalanceCardsProps = {
   campusCode?: string | null;
 };
 
-type BankAction = "deposit" | "withdrawal" | "interest";
+type BankAction = "deposit" | "withdrawal" | "interest" | "collectibles_add";
 
 function formatPeso(amount: number) {
   return (
@@ -45,12 +45,7 @@ export default function BalanceCards({
   const [hand, setHand] = useState(cashOnHand);
   const [coll, setColl] = useState(collectibles);
 
-  // Collectibles inline editing
-  const [editingColl, setEditingColl] = useState(false);
-  const [collInput, setCollInput] = useState("");
-  const [collSaving, setCollSaving] = useState(false);
-
-  // Bank action flow
+  // Calculator flow
   const [bankAction, setBankAction] = useState<BankAction | null>(null);
   const [calcOpen, setCalcOpen] = useState(false);
   const [calcInput, setCalcInput] = useState("");
@@ -58,38 +53,6 @@ export default function BalanceCards({
 
   const totalBalance = bank + hand;
 
-  // --- Collectibles editing ---
-  function startEditColl() {
-    setEditingColl(true);
-    setCollInput(String(coll));
-  }
-
-  function cancelEditColl() {
-    setEditingColl(false);
-    setCollInput("");
-  }
-
-  async function saveEditColl() {
-    const parsed = parseFloat(collInput);
-    if (isNaN(parsed) || parsed < 0) return;
-    setCollSaving(true);
-    const supabase = createClient();
-    let q = supabase.from("balance_cards").update({ collectibles: parsed });
-    if (facultyCode) q = q.eq("faculty_code", facultyCode);
-    else q = q.eq("campus_code", campusCode);
-    await q;
-    setColl(parsed);
-    setCollSaving(false);
-    setEditingColl(false);
-    setCollInput("");
-  }
-
-  function handleCollKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") saveEditColl();
-    if (e.key === "Escape") cancelEditColl();
-  }
-
-  // --- Bank calculator ---
   function openCalc(action: BankAction) {
     setBankAction(action);
     setCalcInput("");
@@ -106,7 +69,7 @@ export default function BalanceCards({
       setCalcInput((prev) => prev.slice(0, -1));
       return;
     }
-    if (key === "." ) {
+    if (key === ".") {
       setCalcInput((prev) => (prev.includes(".") ? prev : prev + "."));
       return;
     }
@@ -121,33 +84,58 @@ export default function BalanceCards({
     if (isNaN(amount) || amount <= 0) return;
     setCalcSaving(true);
 
-    let newBank = bank;
-    let newHand = hand;
+    const supabase = createClient();
 
-    if (bankAction === "deposit") {
-      newBank = bank + amount;
-      newHand = hand - amount;
-    } else if (bankAction === "withdrawal") {
-      newBank = bank - amount;
-      newHand = hand + amount;
+    if (bankAction === "collectibles_add") {
+      const newColl = coll + amount;
+      let q = supabase.from("balance_cards").update({ collectibles: newColl });
+      if (facultyCode) q = q.eq("faculty_code", facultyCode);
+      else q = q.eq("campus_code", campusCode);
+      await q;
+      setColl(newColl);
     } else if (bankAction === "interest") {
-      newBank = bank + amount;
+      const newBank = bank + amount;
+      let selQ = supabase
+        .from("balance_cards")
+        .select("initial_cash_on_bank, initial_account_balance");
+      if (facultyCode) selQ = selQ.eq("faculty_code", facultyCode);
+      else selQ = selQ.eq("campus_code", campusCode);
+      const { data: balData } = await selQ.single();
+      const newInitialBank = ((balData?.initial_cash_on_bank as number) || 0) + amount;
+      const newInitialBal = ((balData?.initial_account_balance as number) || 0) + amount;
+      let updQ = supabase.from("balance_cards").update({
+        cash_on_bank: newBank,
+        initial_cash_on_bank: newInitialBank,
+        initial_account_balance: newInitialBal,
+      });
+      if (facultyCode) updQ = updQ.eq("faculty_code", facultyCode);
+      else updQ = updQ.eq("campus_code", campusCode);
+      await updQ;
+      setBank(newBank);
+    } else {
+      let newBank = bank;
+      let newHand = hand;
+      if (bankAction === "deposit") {
+        newBank = bank + amount;
+        newHand = hand - amount;
+      } else if (bankAction === "withdrawal") {
+        newBank = bank - amount;
+        newHand = hand + amount;
+      }
+      let q = supabase.from("balance_cards").update({
+        cash_on_bank: newBank,
+        cash_on_hand: newHand,
+      });
+      if (facultyCode) q = q.eq("faculty_code", facultyCode);
+      else q = q.eq("campus_code", campusCode);
+      await q;
+      setBank(newBank);
+      setHand(newHand);
     }
 
-    const supabase = createClient();
-    let q = supabase.from("balance_cards").update({
-      cash_on_bank: newBank,
-      cash_on_hand: newHand,
-    });
-    if (facultyCode) q = q.eq("faculty_code", facultyCode);
-    else q = q.eq("campus_code", campusCode);
-    await q;
-
-    setBank(newBank);
-    setHand(newHand);
     setCalcSaving(false);
     closeCalc();
-  }, [calcInput, bank, hand, bankAction, facultyCode, campusCode]);
+  }, [calcInput, bank, hand, coll, bankAction, facultyCode, campusCode]);
 
   // Keyboard support for calculator
   useEffect(() => {
@@ -176,6 +164,15 @@ export default function BalanceCards({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [calcOpen, handleCalcKey, confirmCalc]);
 
+  const dialogTitle =
+    bankAction === "withdrawal"
+      ? "Withdrawal"
+      : bankAction === "interest"
+      ? "Interest Earnings"
+      : bankAction === "collectibles_add"
+      ? "Add to Collectibles"
+      : "Deposit";
+
   return (
     <>
       <div className="flex gap-4 font-lexend">
@@ -202,39 +199,16 @@ export default function BalanceCards({
             <div className="bg-white rounded-xl px-5 py-4 flex items-center justify-between flex-1 shadow-md">
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-500 font-medium mb-1">Collectibles</p>
-                {editingColl ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-bold text-gray-900">₱</span>
-                    <input
-                      autoFocus
-                      type="number"
-                      min="0"
-                      value={collInput}
-                      onChange={(e) => setCollInput(e.target.value)}
-                      onKeyDown={handleCollKeyDown}
-                      className="w-full text-sm font-bold text-gray-900 border-b border-gray-400 outline-none bg-transparent"
-                    />
-                    <button onClick={saveEditColl} disabled={collSaving} className="text-green-500 hover:text-green-700">
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button onClick={cancelEditColl} className="text-gray-400 hover:text-gray-600">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-lg font-bold text-gray-900">
-                    {visible ? formatPeso(coll) : "₱ ••••••"}
-                  </p>
-                )}
+                <p className="text-lg font-bold text-gray-900">
+                  {visible ? formatPeso(coll) : "₱ ••••••"}
+                </p>
               </div>
-              {!editingColl && (
-                <button
-                  onClick={startEditColl}
-                  className="text-gray-400 hover:text-gray-600 transition-colors self-start ml-2"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={() => openCalc("collectibles_add")}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors self-start ml-2"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Cash On-Hand (read-only) */}
@@ -274,23 +248,23 @@ export default function BalanceCards({
         </div>
       </div>
 
-      {/* Bank Calculator Dialog */}
+      {/* Calculator Dialog */}
       <Dialog open={calcOpen} onOpenChange={(o) => { if (!o) closeCalc(); }}>
         <DialogContent className="w-72 font-lexend p-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
-              {bankAction === "withdrawal" ? "Withdrawal" : bankAction === "interest" ? "Interest Earnings" : "Deposit"}
+              {dialogTitle}
             </DialogTitle>
           </DialogHeader>
 
-          {/* Tabs — only shown for + (deposit/interest) */}
-          {bankAction !== "withdrawal" && (
+          {/* Tabs — only shown for bank + (deposit/interest) */}
+          {(bankAction === "deposit" || bankAction === "interest") && (
             <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mt-1">
               {(["deposit", "interest"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => { setBankAction(tab); setCalcInput(""); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-colors ${tab === "interest" ? "pl-3" : ""} ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                     bankAction === tab
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-500 hover:text-gray-700"
