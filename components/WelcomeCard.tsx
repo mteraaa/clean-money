@@ -2,14 +2,13 @@ type Props = {
   name: string;
   onAdd?: () => void;
   onPreview?: () => void;
+  onPublish?: () => void;
 };
 
-export default function WelcomeCard({ name, onAdd, onPreview }: Props) {
+export default function WelcomeCard({ name, onAdd, onPreview, onPublish }: Props) {
   return (
     <div className="bg-white rounded-xl shadow-md px-6 py-4 flex items-center justify-between font-lexend mb-4">
-      <h1 className="text-lg font-semibold text-gray-900">
-        Welcome, <span className="font-bold">{name}</span>!
-      </h1>
+      <h1 className="text-lg font-lexend-exa font-bold text-gray-900 uppercase">{name}</h1>
       <div className="flex items-center gap-2">
         <button
           onClick={onAdd}
@@ -23,7 +22,7 @@ export default function WelcomeCard({ name, onAdd, onPreview }: Props) {
         >
           Preview
         </button>
-        <button className="bg-gray-900 text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-gray-700 transition-colors">
+        <button onClick={onPublish} className="bg-gray-900 text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-gray-700 transition-colors">
           Publish
         </button>
       </div>

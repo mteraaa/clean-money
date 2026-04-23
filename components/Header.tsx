@@ -40,19 +40,22 @@ export default function Header() {
       } | null;
 
       let orgName = "";
+      let campusCode = userData?.campus_code;
 
-      if (userData?.faculty_code) {
-        const { data: facultyData } = await supabase
+      if (userData?.faculty_code && !campusCode) {
+        const { data: facData } = await supabase
           .from("faculty_seb")
-          .select("name")
+          .select("campus_code")
           .eq("faculty_code", userData.faculty_code)
           .single();
-        orgName = facultyData?.name ?? "";
-      } else if (userData?.campus_code) {
+        campusCode = facData?.campus_code ?? null;
+      }
+
+      if (campusCode) {
         const { data: campusData } = await supabase
           .from("campus_seb")
           .select("name")
-          .eq("campus_code", userData.campus_code)
+          .eq("campus_code", campusCode)
           .single();
         orgName = campusData?.name ?? "";
       }
@@ -71,7 +74,7 @@ export default function Header() {
     <header className="bg-[#fafafa] px-10 py-8 shadow-[0px_4px_10px_0px_rgba(74,85,104,0.2)] relative z-10">
       <div className="flex items-baseline gap-3">
         <span className="font-lexend-exa font-bold text-xl tracking-wide uppercase">
-          {data?.org_name ?? ""}
+          VSU - {data?.org_name ?? ""}
         </span>
         {data && (
           <span className="text-gray-400 text-sm font-inter">

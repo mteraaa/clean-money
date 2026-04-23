@@ -32,7 +32,45 @@ const Y = {
   bdHand: 406,
   bdBank: 393,
   bdCollectibles: 380,
+  // Lower section — "Deposited with" and signatures
+  receiver: 340,
+  designation: 340,
+  dateDeposited: 327,
+  amountWords: 327,
+  amountNum: 327,
+  treasurer: 266,
+  auditDay: 213,
+  auditMonth: 213,
+  auditYear: 213,
+  auditor: 173,
 };
+
+// X positions for lower section
+const X_RECEIVER = 226;
+const X_DESIGNATION = 422;
+const X_DATE_DEP = 152;
+const X_AMT_WORDS = 257;
+const X_AMT_NUM = 467;
+const X_TREASURER = 394;
+const X_AUDIT_DAY = 194;
+const X_AUDIT_MONTH = 278;
+const X_AUDIT_YEAR = 354;
+const X_AUDITOR = 394;
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 function fmt(n: number) {
   return n.toLocaleString("en-PH", {
@@ -41,7 +79,81 @@ function fmt(n: number) {
   });
 }
 
-export async function GET() {
+function numberToWords(num: number): string {
+  if (num === 0) return "Zero Pesos";
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tensArr = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+  function w(n: number): string {
+    if (n < 20) return ones[n];
+    if (n < 100)
+      return tensArr[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+    if (n < 1000)
+      return (
+        ones[Math.floor(n / 100)] +
+        " Hundred" +
+        (n % 100 ? " " + w(n % 100) : "")
+      );
+    if (n < 1_000_000)
+      return (
+        w(Math.floor(n / 1000)) +
+        " Thousand" +
+        (n % 1000 ? " " + w(n % 1000) : "")
+      );
+    return (
+      w(Math.floor(n / 1_000_000)) +
+      " Million" +
+      (n % 1_000_000 ? " " + w(n % 1_000_000) : "")
+    );
+  }
+  const intPart = Math.floor(Math.abs(num));
+  const cents = Math.round((Math.abs(num) - intPart) * 100);
+  let result = w(intPart) + " Pesos";
+  if (cents > 0) result += " and " + w(cents) + " Centavos";
+  return result;
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const qReceiver = searchParams.get("receiver") ?? "";
+  const qDesignation = searchParams.get("designation") ?? "";
+  const qDateDep = searchParams.get("dateDeposited") ?? "";
+  const qAmount = searchParams.get("amount") ?? "";
+  const qTreasurer = searchParams.get("treasurer") ?? "";
+  const qAuditDate = searchParams.get("auditDate") ?? "";
+  const qAuditor = searchParams.get("auditor") ?? "";
+
   const supabase = await createClient();
 
   const {
@@ -159,7 +271,7 @@ export async function GET() {
     (sem.academic_years as { year_label?: string } | null)?.year_label ?? "";
   const [y1, y2] = yearLabel.split("-");
 
-  // Load template from disk (server-side — no HTTP fetch)
+  // Load template
   const templatePath = path.join(
     process.cwd(),
     "public",
@@ -171,10 +283,16 @@ export async function GET() {
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const page = pdfDoc.getPages()[0];
 
-  function draw(text: string, x: number, y: number) {
-    page.drawText(text, { x, y, size: SZ, font, color: COLOR });
+  function draw(text: string, x: number, y: number, size = SZ) {
+    page.drawText(text, { x, y, size, font, color: COLOR });
   }
 
+  function fitSize(text: string, maxWidth: number, maxSize: number): number {
+    const w = font.widthOfTextAtSize(text, maxSize);
+    return w <= maxWidth ? maxSize : (maxWidth / w) * maxSize;
+  }
+
+  // ── Financial data ──
   draw(semName, 248, Y.semester);
   draw((y1 ?? "").slice(-2), 361, Y.semester);
   draw((y2 ?? "").slice(-2), 406, Y.semester);
@@ -206,12 +324,62 @@ export async function GET() {
   draw(fmt(Number(bal?.cash_on_bank) || 0), X_BREAKDOWN, Y.bdBank);
   draw(fmt(collectiblesB), X_BREAKDOWN, Y.bdCollectibles);
 
+  // ── Lower section — certification fields ──
+  if (qReceiver)
+    draw(
+      qReceiver,
+      X_RECEIVER,
+      Y.receiver,
+      fitSize(qReceiver, X_DESIGNATION - X_RECEIVER - 48, 9),
+    );
+  if (qDesignation)
+    draw(
+      qDesignation,
+      X_DESIGNATION,
+      Y.designation,
+      fitSize(qDesignation, 559 - X_DESIGNATION - 5, 9),
+    );
+
+  // Date deposited: format YYYY-MM-DD → Month DD, YYYY
+  if (qDateDep) {
+    const [dy, dm, dd] = qDateDep.split("-");
+    const depFormatted = `${MONTHS[parseInt(dm) - 1] ?? ""} ${parseInt(dd)}, ${dy}`;
+    draw(depFormatted, X_DATE_DEP, Y.dateDeposited);
+  }
+
+  // Amount: words on the long blank, number in (P___)
+  if (qAmount) {
+    const amtNum = parseFloat(qAmount);
+    if (!isNaN(amtNum)) {
+      const words = numberToWords(amtNum);
+      draw(
+        words,
+        X_AMT_WORDS,
+        Y.amountWords,
+        Math.max(6, fitSize(words, 155, 11)),
+      );
+      draw(fmt(amtNum), X_AMT_NUM, Y.amountNum);
+    }
+  }
+
+  if (qTreasurer) draw(qTreasurer, X_TREASURER, Y.treasurer);
+
+  // Audit date: split into day, month name, 2-digit year
+  if (qAuditDate) {
+    const [ay, am, ad] = qAuditDate.split("-");
+    draw(String(parseInt(ad)), X_AUDIT_DAY, Y.auditDay);
+    draw(MONTHS[parseInt(am) - 1] ?? "", X_AUDIT_MONTH, Y.auditMonth);
+    draw(ay.slice(-2), X_AUDIT_YEAR, Y.auditYear);
+  }
+
+  if (qAuditor) draw(qAuditor, X_AUDITOR, Y.auditor);
+
   const pdfBytes = await pdfDoc.save();
 
-  return new NextResponse(pdfBytes, {
+  return new NextResponse(Buffer.from(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'inline; filename="financial-report.pdf"',
+      "Content-Disposition": "inline",
     },
   });
 }
