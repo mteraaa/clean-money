@@ -8,6 +8,7 @@ import IncomeEntriesTable from "@/components/IncomeEntriesTable";
 import ExpenseEntriesTable from "@/components/ExpenseEntriesTable";
 import AddEntrySheet, { FormState } from "@/components/AddEntrySheet";
 import PDFViewerCard from "@/components/PDFViewerCard";
+import PublishDialog from "@/components/PublishDialog";
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState<string>("");
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [balanceKey, setBalanceKey] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -43,7 +45,22 @@ export default function DashboardPage() {
         .single();
 
       if (!userData) return;
-      setUserName(userData.full_name ?? "");
+
+      if (userData.faculty_code) {
+        const { data: facData } = await supabase
+          .from("faculty_seb")
+          .select("name")
+          .eq("faculty_code", userData.faculty_code)
+          .single();
+        setUserName(facData?.name ?? "");
+      } else if (userData.campus_code) {
+        const { data: camData } = await supabase
+          .from("campus_seb")
+          .select("name")
+          .eq("campus_code", userData.campus_code)
+          .single();
+        setUserName(camData?.name ?? "");
+      }
 
       let balanceQuery = supabase
         .from("balance_cards")
@@ -148,7 +165,7 @@ export default function DashboardPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
-      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} onPreview={() => setPreviewOpen(true)} />
+      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} onPreview={() => setPreviewOpen(true)} onPublish={() => setPublishOpen(true)} />
       {balance && (
         <>
           <BalanceCards
@@ -177,6 +194,7 @@ export default function DashboardPage() {
       )}
 
       <PDFViewerCard open={previewOpen} onClose={() => setPreviewOpen(false)} />
+      <PublishDialog open={publishOpen} onClose={() => setPublishOpen(false)} />
 
       <AddEntrySheet
         open={addSheetOpen}
