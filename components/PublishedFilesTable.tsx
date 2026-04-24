@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import {
   FileText,
@@ -30,6 +32,7 @@ export type PublishedFile = {
   published_at: string;
   url?: string;
   folder_id?: number;
+  file_path?: string;
 };
 
 type SortField = "title" | "published_at";
@@ -95,13 +98,17 @@ function SortIcon({
 type Props = {
   files: PublishedFile[];
   onFolderClick?: (folderId: number) => void;
+  onDelete?: (ids: string[]) => Promise<void>;
 };
 
-export default function PublishedFilesTable({ files, onFolderClick }: Props) {
+export default function PublishedFilesTable({ files, onFolderClick, onDelete }: Props) {
   const [sortField, setSortField] = useState<SortField>("published_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [viewer, setViewer] = useState<FileViewer | null>(null);
   const [zoom, setZoom] = useState(0.75);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   useEffect(() => {
     if (!viewer || !isImage(viewer.mime_type)) return;
     const handler = (e: WheelEvent) => {
@@ -114,6 +121,36 @@ export default function PublishedFilesTable({ files, onFolderClick }: Props) {
     document.addEventListener("wheel", handler, { passive: false });
     return () => document.removeEventListener("wheel", handler);
   }, [viewer]);
+
+  function toggleSelectMode() {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === sorted.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sorted.map((f) => f.id)));
+    }
+  }
+
+  async function handleDelete() {
+    if (selectedIds.size === 0 || !onDelete) return;
+    setDeleting(true);
+    await onDelete(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setDeleting(false);
+  }
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -136,16 +173,16 @@ export default function PublishedFilesTable({ files, onFolderClick }: Props) {
   });
 
   function handleRowClick(file: PublishedFile) {
+    if (selectMode) {
+      toggleSelect(file.id);
+      return;
+    }
     if (
       (isPdf(file.mime_type) || isImage(file.mime_type)) &&
       file.url &&
       file.mime_type
     ) {
-      setViewer({
-        url: file.url,
-        title: file.title,
-        mime_type: file.mime_type,
-      });
+      setViewer({ url: file.url, title: file.title, mime_type: file.mime_type });
     } else if (file.mime_type === "folder" && file.folder_id && onFolderClick) {
       onFolderClick(file.folder_id);
     }
@@ -252,30 +289,55 @@ export default function PublishedFilesTable({ files, onFolderClick }: Props) {
         <Table>
           <TableHeader>
             <TableRow className="bg-[#E5E7EB] hover:bg-[#E5E7EB] border-b border-gray-200">
+              {selectMode && (
+                <TableHead className="py-3 px-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === sorted.length && sorted.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer"
+                  />
+                </TableHead>
+              )}
               <TableHead
-                className="font-inter font-bold text-gray-800 py-3 px-4 w-3/4 cursor-pointer select-none"
+                className="font-inter font-bold text-gray-800 py-3 px-4 cursor-pointer select-none"
                 onClick={() => handleSort("title")}
               >
                 <div className="flex items-center gap-1">
                   Name
-                  <SortIcon
-                    field="title"
-                    sortField={sortField}
-                    sortDir={sortDir}
-                  />
+                  <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
                 </div>
               </TableHead>
               <TableHead
-                className="font-inter font-bold text-gray-800 py-3 px-4 w-1/4 cursor-pointer select-none"
+                className="font-inter font-bold text-gray-800 py-3 px-4 cursor-pointer select-none"
                 onClick={() => handleSort("published_at")}
               >
                 <div className="flex items-center gap-1">
                   Date Published
-                  <SortIcon
-                    field="published_at"
-                    sortField={sortField}
-                    sortDir={sortDir}
-                  />
+                  <SortIcon field="published_at" sortField={sortField} sortDir={sortDir} />
+                </div>
+              </TableHead>
+              <TableHead className="py-3 px-4 text-right">
+                <div className="flex items-center justify-end gap-2">
+                  {selectMode && onDelete && (
+                    <button
+                      onClick={handleDelete}
+                      disabled={selectedIds.size === 0 || deleting}
+                      className="border border-red-300 text-red-500 rounded-lg px-3 py-1 text-xs font-medium hover:bg-red-50 transition-colors disabled:opacity-40"
+                    >
+                      {deleting ? "Deleting…" : `Delete${selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}`}
+                    </button>
+                  )}
+                  <button
+                    onClick={toggleSelectMode}
+                    className={`rounded-lg px-3 py-1 text-xs font-medium border transition-colors ${
+                      selectMode
+                        ? "border-gray-400 text-gray-600 hover:bg-gray-100"
+                        : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    {selectMode ? "Cancel" : "Select"}
+                  </button>
                 </div>
               </TableHead>
             </TableRow>
@@ -284,9 +346,20 @@ export default function PublishedFilesTable({ files, onFolderClick }: Props) {
             {sorted.map((file) => (
               <TableRow
                 key={file.id}
-                className="border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer"
+                className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer ${selectedIds.has(file.id) ? "bg-gray-100" : ""}`}
                 onClick={() => handleRowClick(file)}
               >
+                {selectMode && (
+                  <TableCell className="py-3 px-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(file.id)}
+                      onChange={() => toggleSelect(file.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer"
+                    />
+                  </TableCell>
+                )}
                 <TableCell className="font-inter text-sm py-3 px-4">
                   <div className="flex items-center gap-2">
                     <FileIcon mimeType={file.mime_type} />
@@ -296,6 +369,7 @@ export default function PublishedFilesTable({ files, onFolderClick }: Props) {
                 <TableCell className="font-inter text-sm py-3 px-4">
                   {formatDate(file.published_at)}
                 </TableCell>
+                <TableCell />
               </TableRow>
             ))}
           </TableBody>
