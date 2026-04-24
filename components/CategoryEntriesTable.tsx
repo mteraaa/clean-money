@@ -89,6 +89,7 @@ type Props = {
   campusCode?: string | null;
   refreshKey: number;
   onMutation?: () => void;
+  isPublished?: boolean;
 };
 
 export default function CategoryEntriesTable({
@@ -97,6 +98,7 @@ export default function CategoryEntriesTable({
   campusCode,
   refreshKey,
   onMutation,
+  isPublished = false,
 }: Props) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [semesterId, setSemesterId] = useState<number | null>(null);
@@ -249,27 +251,29 @@ export default function CategoryEntriesTable({
       <div className="bg-white rounded-xl shadow-md font-lexend">
         <div className="flex items-center justify-between px-6 py-4">
           <h2 className="font-bold text-lg text-gray-900">{title}</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleSelectMode}
-              className={`border rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-                selectMode
-                  ? "border-gray-900 bg-gray-900 text-white"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {selectMode ? "Cancel" : "Select"}
-            </button>
-            {selectMode && (
+          {!isPublished && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleBulkDelete}
-                disabled={selectedIds.size === 0}
-                className="bg-red-600 text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-40"
+                onClick={toggleSelectMode}
+                className={`border rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                  selectMode
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
               >
-                Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                {selectMode ? "Cancel" : "Select"}
               </button>
-            )}
-          </div>
+              {selectMode && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                  className="bg-red-600 text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-40"
+                >
+                  Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="overflow-y-auto max-h-80">
@@ -352,28 +356,28 @@ export default function CategoryEntriesTable({
                       {formatDate(entry.entry_date)}
                     </td>
                     <td className="px-4 py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => openEditSheet(entry)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-500 focus:text-red-500"
-                            onClick={() => handleDelete(entry.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {!isPublished && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditSheet(entry)}>
+                              <Pencil className="w-4 h-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-500 focus:text-red-500"
+                              onClick={() => handleDelete(entry.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </td>
                   </tr>
                 ))

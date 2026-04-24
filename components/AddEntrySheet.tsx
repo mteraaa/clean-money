@@ -28,6 +28,7 @@ export type FormState = {
   category: "income" | "expense";
   unit_price: string;
   quantity: string;
+  receipt?: File | null;
 };
 
 export const emptyForm: FormState = {
@@ -37,6 +38,7 @@ export const emptyForm: FormState = {
   category: "expense",
   unit_price: "",
   quantity: "",
+  receipt: null,
 };
 
 function formatPeso(amount: number) {
@@ -184,6 +186,30 @@ function EntryFormFields({
         />
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm text-gray-500">Receipt <span className="text-gray-400">(optional)</span></label>
+        <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => onChange({ ...form, receipt: e.target.files?.[0] ?? null })}
+          />
+          <span className="text-sm text-gray-400 truncate">
+            {form.receipt ? form.receipt.name : "Click to upload receipt…"}
+          </span>
+        </label>
+        {form.receipt && (
+          <button
+            type="button"
+            onClick={() => onChange({ ...form, receipt: null })}
+            className="text-xs text-red-400 hover:text-red-600 text-left"
+          >
+            Remove receipt
+          </button>
+        )}
+      </div>
+
       <div className="flex items-end justify-between mt-2 pb-6">
         <div className="flex flex-col gap-1">
           <label className="text-sm text-gray-500">Total</label>
@@ -322,33 +348,37 @@ export default function AddEntrySheet(props: Props) {
                 </React.Fragment>
                 );
               })}
-              <button
-                type="button"
-                onClick={addAnotherEntry}
-                className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mt-6 mb-2 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Another Entry
-              </button>
             </>
           )}
         </div>
 
-        <div className="pt-6 flex justify-end gap-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <button
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-            className="border border-gray-300 text-gray-700 rounded-lg px-6 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={submitting}
-            className="bg-gray-900 text-white rounded-lg px-8 py-3 text-sm font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50"
-          >
-            {submitting ? "Saving..." : isEdit ? "Save Changes" : "Save"}
-          </button>
+        <div className="pt-6 flex justify-between items-center gap-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          {!isEdit ? (
+            <button
+              type="button"
+              onClick={addAnotherEntry}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Another Entry
+            </button>
+          ) : <span />}
+          <div className="flex gap-2">
+            <button
+              onClick={() => onOpenChange(false)}
+              disabled={submitting}
+              className="border border-gray-300 text-gray-700 rounded-lg px-6 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={submitting}
+              className="bg-gray-900 text-white rounded-lg px-8 py-3 text-sm font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50"
+            >
+              {submitting ? "Saving..." : isEdit ? "Save Changes" : "Save"}
+            </button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>
