@@ -16,6 +16,7 @@ type BalanceCardsProps = {
   collectibles?: number;
   facultyCode?: string | null;
   campusCode?: string | null;
+  isPublished?: boolean;
 };
 
 type BankAction = "deposit" | "withdrawal" | "interest" | "collectibles_add";
@@ -39,6 +40,7 @@ export default function BalanceCards({
   collectibles = 0,
   facultyCode,
   campusCode,
+  isPublished = false,
 }: BalanceCardsProps) {
   const [visible, setVisible] = useState(true);
   const [bank, setBank] = useState(cashOnBank);
@@ -203,12 +205,14 @@ export default function BalanceCards({
                   {visible ? formatPeso(coll) : "₱ ••••••"}
                 </p>
               </div>
-              <button
-                onClick={() => openCalc("collectibles_add")}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors self-start ml-2"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+              {!isPublished && (
+                <button
+                  onClick={() => openCalc("collectibles_add")}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors self-start ml-2"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Cash On-Hand (read-only) */}
@@ -226,20 +230,22 @@ export default function BalanceCards({
           <div className="flex-1 bg-white rounded-xl px-5 py-4 flex flex-col justify-between shadow-md min-h-35">
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-500 font-medium">Cash On-Bank</p>
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => openCalc("withdrawal")}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-red-300 text-red-500 hover:bg-red-50 transition-colors text-base font-semibold leading-none"
-                >
-                  −
-                </button>
-                <button
-                  onClick={() => openCalc("deposit")}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors text-base font-semibold leading-none"
-                >
-                  +
-                </button>
-              </div>
+              {!isPublished && (
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => openCalc("withdrawal")}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-red-300 text-red-500 hover:bg-red-50 transition-colors text-base font-semibold leading-none"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => openCalc("deposit")}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors text-base font-semibold leading-none"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
             </div>
             <p className="text-3xl font-bold text-gray-900 mt-auto">
               {visible ? formatPeso(bank) : "₱ ••••••"}

@@ -9,6 +9,7 @@ import ExpenseEntriesTable from "@/components/ExpenseEntriesTable";
 import AddEntrySheet, { FormState } from "@/components/AddEntrySheet";
 import PDFViewerCard from "@/components/PDFViewerCard";
 import PublishDialog from "@/components/PublishDialog";
+import UnpublishDialog from "@/components/UnpublishDialog";
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState<string>("");
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   } | null>(null);
 
   const [semesterId, setSemesterId] = useState<number | null>(null);
+  const [semesterMeta, setSemesterMeta] = useState<{ name: string; yearLabel: string } | null>(null);
   const [nextControlNumbers, setNextControlNumbers] = useState({ income: 1, expense: 1 });
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [addSubmitting, setAddSubmitting] = useState(false);
@@ -28,6 +30,12 @@ export default function DashboardPage() {
   const [balanceKey, setBalanceKey] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [unpublishOpen, setUnpublishOpen] = useState(false);
+  const [publishedReport, setPublishedReport] = useState<{
+    id: number;
+    file_path: string;
+    bucket: string;
+  } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -82,12 +90,15 @@ export default function DashboardPage() {
 
       const { data: sem } = await supabase
         .from("semesters")
-        .select("id")
+        .select("id, semester_name, academic_years(year_label)")
         .eq("is_active", true)
         .single();
 
       if (!sem) return;
       setSemesterId(sem.id);
+      const ayRaw = sem.academic_years;
+      const yearLabel = ((Array.isArray(ayRaw) ? ayRaw[0] : ayRaw) as { year_label?: string } | null)?.year_label ?? "";
+      setSemesterMeta({ name: sem.semester_name ?? "", yearLabel });
 
       const scope = userData.faculty_code
         ? { col: "faculty_code", val: userData.faculty_code }
@@ -98,6 +109,19 @@ export default function DashboardPage() {
         supabase.from("entries").select("id", { count: "exact", head: true }).eq("semester_id", sem.id).eq("category", "expense").eq(scope.col, scope.val),
       ]);
       setNextControlNumbers({ income: (incomeCount ?? 0) + 1, expense: (expenseCount ?? 0) + 1 });
+
+      // Check if a report is already published for this semester
+      const reportQ = supabase.from("reports").select("id, file_path").eq("semester_id", sem.id);
+      if (userData.faculty_code) reportQ.eq("faculty_code", userData.faculty_code);
+      else reportQ.eq("campus_code", userData.campus_code);
+      const { data: existingReport } = await reportQ.maybeSingle();
+      if (existingReport) {
+        setPublishedReport({
+          id: existingReport.id,
+          file_path: existingReport.file_path,
+          bucket: userData.faculty_code ? "Faculties" : "Campus SEB",
+        });
+      }
     })();
   }, []);
 
@@ -111,6 +135,84 @@ export default function DashboardPage() {
     if (error) console.error("Balance fetch error:", error.message);
     if (data) setBalance((prev) => prev ? { ...prev, ...data } : prev);
     setBalanceKey((prev) => prev + 1);
+  }
+
+  async function handleUnpublish() {
+    if (!publishedReport) return;
+    const supabase = createClient();
+    await supabase.storage.from(publishedReport.bucket).remove([publishedReport.file_path]);
+    await supabase.from("reports").delete().eq("id", publishedReport.id);
+    setPublishedReport(null);
+    setUnpublishOpen(false);
+  }
+
+  async function uploadReceipt(
+    supabase: ReturnType<typeof createClient>,
+    userId: string,
+    file: File,
+    entryId: number,
+  ) {
+    if (!balance || !semesterId || !semesterMeta) return;
+
+    const bucket = balance.faculty_code ? "Faculties" : "Campus SEB";
+    let folderName = "";
+    let storageFolderPath = "";
+
+    if (balance.faculty_code) {
+      const { data: facData } = await supabase
+        .from("faculty_seb").select("campus_code").eq("faculty_code", balance.faculty_code).single();
+      const { data: campusData } = await supabase
+        .from("campus_seb").select("name").eq("campus_code", facData?.campus_code).single();
+      const campusName = campusData?.name ?? "";
+      folderName = `${balance.faculty_code}-SEB Receipts Compilation (${semesterMeta.yearLabel}_${semesterMeta.name})`;
+      storageFolderPath = `${campusName}/${balance.faculty_code}/Receipts/${folderName}`;
+    } else {
+      const { data: campusData } = await supabase
+        .from("campus_seb").select("name").eq("campus_code", balance.campus_code).single();
+      const campusName = campusData?.name ?? balance.campus_code ?? "";
+      folderName = `SEB-${campusName} Receipts Compilation (${semesterMeta.yearLabel}_${semesterMeta.name})`;
+      storageFolderPath = `${balance.campus_code}/Receipts/${folderName}`;
+    }
+
+    // Ensure folder record exists
+    const folderQ = supabase.from("receipt_archive_folders").select("id").eq("semester_id", semesterId).eq("folder_name", folderName);
+    if (balance.faculty_code) folderQ.eq("faculty_code", balance.faculty_code);
+    else folderQ.eq("campus_code", balance.campus_code);
+    let { data: folderData } = await folderQ.maybeSingle();
+
+    if (!folderData) {
+      const newFolder: Record<string, unknown> = {
+        folder_name: folderName,
+        semester_id: semesterId,
+        created_by: userId,
+      };
+      if (balance.faculty_code) newFolder.faculty_code = balance.faculty_code;
+      else newFolder.campus_code = balance.campus_code;
+      const { data: created } = await supabase.from("receipt_archive_folders").insert(newFolder).select("id").single();
+      folderData = created;
+    }
+
+    if (!folderData) return;
+
+    // Upload file to storage
+    const ext = file.name.split(".").pop() ?? "";
+    const storedName = `${Date.now()}-${file.name}`;
+    const filePath = `${storageFolderPath}/${storedName}`;
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, { contentType: file.type, upsert: false });
+    if (uploadError) { console.error("Receipt upload error:", uploadError.message); return; }
+
+    // Track in receipt_archive_files
+    await supabase.from("receipt_archive_files").insert({
+      folder_id: folderData.id,
+      entry_receipt_id: entryId,
+      original_name: file.name,
+      stored_name: storedName,
+      file_path: filePath,
+      file_size_bytes: file.size,
+      mime_type: file.type || `image/${ext}`,
+      added_by: userId,
+      added_at: new Date().toISOString(),
+    });
   }
 
   async function handleAdd(forms: FormState[]) {
@@ -147,8 +249,13 @@ export default function DashboardPage() {
       if (balance.faculty_code) payload.faculty_code = balance.faculty_code;
       else payload.campus_code = balance.campus_code;
 
-      const { error } = await supabase.from("entries").insert(payload);
+      const { data: entryData, error } = await supabase.from("entries").insert(payload).select("id").single();
       if (error) { console.error("Insert error:", error.message); setAddSubmitting(false); return; }
+
+      // Upload receipt if provided
+      if (f.receipt && semesterMeta && balance) {
+        await uploadReceipt(supabase, user.id, f.receipt, entryData.id);
+      }
     }
 
     await refreshBalance();
@@ -165,7 +272,14 @@ export default function DashboardPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
-      <WelcomeCard name={userName} onAdd={() => setAddSheetOpen(true)} onPreview={() => setPreviewOpen(true)} onPublish={() => setPublishOpen(true)} />
+      <WelcomeCard
+        name={userName}
+        isPublished={!!publishedReport}
+        onAdd={() => setAddSheetOpen(true)}
+        onPreview={() => setPreviewOpen(true)}
+        onPublish={() => setPublishOpen(true)}
+        onUnpublish={() => setUnpublishOpen(true)}
+      />
       {balance && (
         <>
           <BalanceCards
@@ -175,18 +289,21 @@ export default function DashboardPage() {
             collectibles={balance.collectibles}
             facultyCode={balance.faculty_code}
             campusCode={balance.campus_code}
+            isPublished={!!publishedReport}
           />
           <div className="grid grid-cols-2 gap-4 mt-4">
             <ExpenseEntriesTable
               facultyCode={balance.faculty_code}
               campusCode={balance.campus_code}
               refreshKey={refreshKey}
+              isPublished={!!publishedReport}
               onMutation={() => { setRefreshKey((prev) => prev + 1); refreshBalance(); }}
             />
             <IncomeEntriesTable
               facultyCode={balance.faculty_code}
               campusCode={balance.campus_code}
               refreshKey={refreshKey}
+              isPublished={!!publishedReport}
               onMutation={() => { setRefreshKey((prev) => prev + 1); refreshBalance(); }}
             />
           </div>
@@ -194,7 +311,16 @@ export default function DashboardPage() {
       )}
 
       <PDFViewerCard open={previewOpen} onClose={() => setPreviewOpen(false)} />
-      <PublishDialog open={publishOpen} onClose={() => setPublishOpen(false)} />
+      <PublishDialog
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        onPublishSuccess={(report) => setPublishedReport(report)}
+      />
+      <UnpublishDialog
+        open={unpublishOpen}
+        onClose={() => setUnpublishOpen(false)}
+        onConfirm={handleUnpublish}
+      />
 
       <AddEntrySheet
         open={addSheetOpen}

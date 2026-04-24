@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
+type PublishedReport = { id: number; file_path: string; bucket: string };
+
 type Props = {
   open: boolean;
   onClose: () => void;
+  onPublishSuccess?: (report: PublishedReport) => void;
 };
 
 type Form = {
@@ -106,7 +109,7 @@ function buildUrl(form: Form): string {
   return `/api/generate-report?${p.toString()}`;
 }
 
-export default function PublishDialog({ open, onClose }: Props) {
+export default function PublishDialog({ open, onClose, onPublishSuccess }: Props) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [pdfSrc, setPdfSrc] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -176,8 +179,23 @@ export default function PublishDialog({ open, onClose }: Props) {
       const semesterName = sem.semester_name ?? "";
 
       let title = "";
+      let filePath = "";
+      const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
+
       if (userData.faculty_code) {
+        const { data: facData } = await supabase
+          .from("faculty_seb")
+          .select("campus_code")
+          .eq("faculty_code", userData.faculty_code)
+          .single();
+        const { data: campusData } = await supabase
+          .from("campus_seb")
+          .select("name")
+          .eq("campus_code", facData?.campus_code)
+          .single();
+        const campusName = campusData?.name ?? "";
         title = `${userData.faculty_code}-SEB Financial Report (${yearLabel}_${semesterName})`;
+        filePath = `${campusName}/${userData.faculty_code}/Financial Reports/${title}.pdf`;
       } else {
         const { data: campusData } = await supabase
           .from("campus_seb")
@@ -186,12 +204,8 @@ export default function PublishDialog({ open, onClose }: Props) {
           .single();
         const campusName = campusData?.name ?? userData.campus_code ?? "";
         title = `SEB-${campusName} Financial Report (${yearLabel}_${semesterName})`;
+        filePath = `${userData.campus_code}/Financial Reports/${title}.pdf`;
       }
-
-      const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
-      const code = userData.faculty_code ?? userData.campus_code;
-      const fileName = `${title}.pdf`;
-      const filePath = `${code}/${fileName}`;
 
       // 3. Upload to storage bucket (upsert to overwrite if file already exists)
       const { error: uploadError } = await supabase.storage
@@ -214,35 +228,47 @@ export default function PublishDialog({ open, onClose }: Props) {
 
       if (existing) {
         // Update the existing row — preserves all past semester reports
+        const updFileName = filePath.split("/").pop() ?? `${title}.pdf`;
         const { error: updateError } = await supabase
           .from("reports")
           .update({
             title,
+            original_name: updFileName,
+            stored_name: updFileName,
             file_path: filePath,
             published_at: new Date().toISOString(),
+            published_by: user.id,
           })
           .eq("id", existing.id);
         if (updateError) throw new Error(updateError.message);
+        onPublishSuccess?.({ id: existing.id, file_path: filePath, bucket });
         onClose();
         return;
       }
 
       // 5. No existing report — insert new row
+      const fileName = filePath.split("/").pop() ?? `${title}.pdf`;
       const record: Record<string, unknown> = {
         title,
+        original_name: fileName,
+        stored_name: fileName,
         mime_type: "application/pdf",
         file_path: filePath,
         published_at: new Date().toISOString(),
+        published_by: user.id,
         semester_id: sem.id,
       };
       if (userData.faculty_code) record.faculty_code = userData.faculty_code;
       else record.campus_code = userData.campus_code;
 
-      const { error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await supabase
         .from("reports")
-        .insert(record);
+        .insert(record)
+        .select("id")
+        .single();
       if (insertError) throw new Error(insertError.message);
 
+      onPublishSuccess?.({ id: insertData.id, file_path: filePath, bucket });
       onClose();
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "An error occurred");
