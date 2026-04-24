@@ -4,9 +4,12 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
+type PublishedReport = { id: number; file_path: string; bucket: string };
+
 type Props = {
   open: boolean;
   onClose: () => void;
+  onPublishSuccess?: (report: PublishedReport) => void;
 };
 
 type Form = {
@@ -106,7 +109,7 @@ function buildUrl(form: Form): string {
   return `/api/generate-report?${p.toString()}`;
 }
 
-export default function PublishDialog({ open, onClose }: Props) {
+export default function PublishDialog({ open, onClose, onPublishSuccess }: Props) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [pdfSrc, setPdfSrc] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -238,6 +241,7 @@ export default function PublishDialog({ open, onClose }: Props) {
           })
           .eq("id", existing.id);
         if (updateError) throw new Error(updateError.message);
+        onPublishSuccess?.({ id: existing.id, file_path: filePath, bucket });
         onClose();
         return;
       }
@@ -257,11 +261,14 @@ export default function PublishDialog({ open, onClose }: Props) {
       if (userData.faculty_code) record.faculty_code = userData.faculty_code;
       else record.campus_code = userData.campus_code;
 
-      const { error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await supabase
         .from("reports")
-        .insert(record);
+        .insert(record)
+        .select("id")
+        .single();
       if (insertError) throw new Error(insertError.message);
 
+      onPublishSuccess?.({ id: insertData.id, file_path: filePath, bucket });
       onClose();
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "An error occurred");
