@@ -1,6 +1,7 @@
 import AppSidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import AppToaster from "@/components/AppToaster";
 
 export default function ProtectedLayout({
   children,
@@ -14,6 +15,7 @@ export default function ProtectedLayout({
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Header />
           <main className="flex-1 overflow-auto p-6 bg-[#f3f4f6]">{children}</main>
+          <AppToaster />
         </div>
       </div>
     </SidebarProvider>

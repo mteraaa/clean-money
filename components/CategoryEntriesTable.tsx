@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { logActivity } from "@/utils/logActivity";
+import { toast } from "sonner";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -176,6 +178,7 @@ export default function CategoryEntriesTable({
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
     const supabase = createClient();
+    const deleted = entries.filter((e) => selectedIds.has(e.id));
     const { error } = await supabase.from("entries").delete().in("id", Array.from(selectedIds));
     if (error) { console.error("Bulk delete error:", error.message); return; }
 
@@ -183,15 +186,34 @@ export default function CategoryEntriesTable({
     setSelectedIds(new Set());
     setSelectMode(false);
     onMutation?.();
+    toast.error(`Deleted ${deleted.length} ${category === "income" ? "income" : "expense"} ${deleted.length === 1 ? "entry" : "entries"}`);
+    deleted.forEach((e) => logActivity({
+      description: `Deleted "${e.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
+      action: "DELETE_ENTRY",
+      facultyCode,
+      campusCode,
+      targetTable: "entries",
+      targetId: e.id,
+    }).catch(() => {}));
   }
 
   async function handleDelete(id: number) {
     const supabase = createClient();
+    const entry = entries.find((e) => e.id === id);
     const { error } = await supabase.from("entries").delete().eq("id", id);
     if (error) { console.error("Delete error:", error.message); return; }
 
     setEntries((prev) => prev.filter((e) => e.id !== id));
     onMutation?.();
+    if (entry) toast.error(`Deleted "${entry.description}"`);
+    if (entry) logActivity({
+      description: `Deleted "${entry.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
+      action: "DELETE_ENTRY",
+      facultyCode,
+      campusCode,
+      targetTable: "entries",
+      targetId: id,
+    }).catch(() => {});
   }
 
   function openEditSheet(entry: Entry) {
@@ -237,6 +259,15 @@ export default function CategoryEntriesTable({
       console.error("Update error:", error.message);
     } else {
       setEditSheetOpen(false);
+      toast.success(`Edited "${finalDescription}"`);
+      logActivity({
+        description: `Edited "${finalDescription}" in ${category === "income" ? "Income" : "Expense"} entries`,
+        action: "EDIT_ENTRY",
+        facultyCode,
+        campusCode,
+        targetTable: "entries",
+        targetId: editingEntry.id,
+      }).catch(() => {});
       setEditingEntry(null);
       if (semesterId) await fetchEntries(createClient(), semesterId);
     }
