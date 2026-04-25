@@ -10,6 +10,7 @@ import AddEntrySheet, { FormState } from "@/components/AddEntrySheet";
 import PDFViewerCard from "@/components/PDFViewerCard";
 import PublishDialog from "@/components/PublishDialog";
 import { logActivity } from "@/utils/logActivity";
+import { toast } from "sonner";
 import UnpublishDialog from "@/components/UnpublishDialog";
 
 export default function DashboardPage() {
@@ -331,6 +332,9 @@ export default function DashboardPage() {
 
       const amt = (parseFloat(f.unit_price) || 0) * (parseInt(f.quantity) || 0);
       const fmtAmt = `₱${amt.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      toast.success(
+        `Added ${fmtAmt} to ${f.category === "income" ? "Income" : "Expenses"} for ${finalDescription}`,
+      );
       logActivity({
         description: `Added ${fmtAmt} to ${f.category === "income" ? "Income" : "Expenses"} for ${finalDescription}`,
         action: "ADD_ENTRY",

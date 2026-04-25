@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
+import { toast } from "sonner";
 
 type PublishedReport = { id: number; file_path: string; bucket: string };
 
@@ -282,6 +283,7 @@ export default function PublishDialog({
         targetTable: "reports",
         targetId: insertData.id,
       }).catch(() => {});
+      toast.success("Financial report published successfully");
 
       onPublishSuccess?.({ id: insertData.id, file_path: filePath, bucket });
       onClose();
