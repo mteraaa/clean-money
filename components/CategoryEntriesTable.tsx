@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
+import { toast } from "sonner";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -185,6 +186,7 @@ export default function CategoryEntriesTable({
     setSelectedIds(new Set());
     setSelectMode(false);
     onMutation?.();
+    toast.error(`Deleted ${deleted.length} ${category === "income" ? "income" : "expense"} ${deleted.length === 1 ? "entry" : "entries"}`);
     deleted.forEach((e) => logActivity({
       description: `Deleted "${e.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
       action: "DELETE_ENTRY",
@@ -203,6 +205,7 @@ export default function CategoryEntriesTable({
 
     setEntries((prev) => prev.filter((e) => e.id !== id));
     onMutation?.();
+    if (entry) toast.error(`Deleted "${entry.description}"`);
     if (entry) logActivity({
       description: `Deleted "${entry.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
       action: "DELETE_ENTRY",
@@ -256,6 +259,7 @@ export default function CategoryEntriesTable({
       console.error("Update error:", error.message);
     } else {
       setEditSheetOpen(false);
+      toast.success(`Edited "${finalDescription}"`);
       logActivity({
         description: `Edited "${finalDescription}" in ${category === "income" ? "Income" : "Expense"} entries`,
         action: "EDIT_ENTRY",
