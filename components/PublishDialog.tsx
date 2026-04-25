@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { logActivity } from "@/utils/logActivity";
 
 type PublishedReport = { id: number; file_path: string; bucket: string };
 
@@ -109,7 +110,11 @@ function buildUrl(form: Form): string {
   return `/api/generate-report?${p.toString()}`;
 }
 
-export default function PublishDialog({ open, onClose, onPublishSuccess }: Props) {
+export default function PublishDialog({
+  open,
+  onClose,
+  onPublishSuccess,
+}: Props) {
   const [form, setForm] = useState<Form>(EMPTY);
   const [pdfSrc, setPdfSrc] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -267,6 +272,16 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         .select("id")
         .single();
       if (insertError) throw new Error(insertError.message);
+
+      logActivity({
+        description: `Published financial report: ${title}`,
+        action: "PUBLISH_REPORT",
+        module: "REPORTS",
+        facultyCode: userData.faculty_code,
+        campusCode: userData.campus_code,
+        targetTable: "reports",
+        targetId: insertData.id,
+      }).catch(() => {});
 
       onPublishSuccess?.({ id: insertData.id, file_path: filePath, bucket });
       onClose();

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Eye, EyeOff, Plus, ArrowDownToLine, TrendingUp } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { logActivity } from "@/utils/logActivity";
 import {
   Dialog,
   DialogContent,
@@ -134,6 +135,21 @@ export default function BalanceCards({
       setBank(newBank);
       setHand(newHand);
     }
+
+    const fmtAmt = `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const descriptions: Record<string, string> = {
+      collectibles_add: `Added ${fmtAmt} to Collectibles`,
+      interest: `Added ${fmtAmt} Interest Earnings to Cash on Bank`,
+      deposit: `Deposited ${fmtAmt} to Cash on Bank`,
+      withdrawal: `Withdrew ${fmtAmt} from Cash on Bank`,
+    };
+    logActivity({
+      description: descriptions[bankAction ?? ""] ?? "",
+      action: (bankAction ?? "").toUpperCase(),
+      facultyCode,
+      campusCode,
+      targetTable: "balance_cards",
+    }).catch(() => {});
 
     setCalcSaving(false);
     closeCalc();
