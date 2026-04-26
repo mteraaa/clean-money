@@ -35,19 +35,16 @@ export default function LoginCard() {
     let loginEmail = identifier;
 
     if (!identifier.includes("@")) {
-      const { data, error: lookupError } = await supabase
-        .from("users")
-        .select("email")
-        .eq("username", identifier)
-        .single();
+      const { data: email, error: lookupError } = await supabase
+        .rpc("get_email_by_username", { p_username: identifier });
 
-      if (lookupError || !data?.email) {
+      if (lookupError || !email) {
         setError("No account found with that username.");
         setLoading(false);
         return;
       }
 
-      loginEmail = data.email;
+      loginEmail = email;
     }
 
     const { error } = await supabase.auth.signInWithPassword({

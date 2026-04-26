@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Eye, EyeOff, Plus, ArrowDownToLine, TrendingUp } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Eye,
+  EyeOff,
+  Plus,
+  ArrowDownToLine,
+  TrendingUp,
+  Undo2,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +42,6 @@ function formatPeso(amount: number) {
 
 const CALC_KEYS = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫"];
 
-
 export default function BalanceCards({
   cashOnBank,
   cashOnHand,
@@ -47,6 +54,15 @@ export default function BalanceCards({
   const [bank, setBank] = useState(cashOnBank);
   const [hand, setHand] = useState(cashOnHand);
   const [coll, setColl] = useState(collectibles);
+
+  // Undo state
+  const [prevColl, setPrevColl] = useState<number | null>(null);
+  const [prevBank, setPrevBank] = useState<{
+    bank: number;
+    hand: number;
+  } | null>(null);
+  const collToastId = useRef<string | number | null>(null);
+  const bankToastId = useRef<string | number | null>(null);
 
   // Calculator flow
   const [bankAction, setBankAction] = useState<BankAction | null>(null);
@@ -65,6 +81,44 @@ export default function BalanceCards({
   function closeCalc() {
     setCalcOpen(false);
     setCalcInput("");
+  }
+
+  async function executeUndoColl(value: number) {
+    const supabase = createClient();
+    let q = supabase.from("balance_cards").update({ collectibles: value });
+    if (facultyCode) q = q.eq("faculty_code", facultyCode);
+    else q = q.eq("campus_code", campusCode);
+    await q;
+    setColl(value);
+    setPrevColl(null);
+    collToastId.current = null;
+  }
+
+  async function executeUndoBank(value: { bank: number; hand: number }) {
+    const supabase = createClient();
+    let q = supabase
+      .from("balance_cards")
+      .update({ cash_on_bank: value.bank, cash_on_hand: value.hand });
+    if (facultyCode) q = q.eq("faculty_code", facultyCode);
+    else q = q.eq("campus_code", campusCode);
+    await q;
+    setBank(value.bank);
+    setHand(value.hand);
+    setPrevBank(null);
+    bankToastId.current = null;
+  }
+
+  // Called from card button — also dismisses the toast
+  async function handleUndoColl() {
+    if (prevColl === null) return;
+    if (collToastId.current !== null) toast.dismiss(collToastId.current);
+    await executeUndoColl(prevColl);
+  }
+
+  async function handleUndoBank() {
+    if (!prevBank) return;
+    if (bankToastId.current !== null) toast.dismiss(bankToastId.current);
+    await executeUndoBank(prevBank);
   }
 
   const handleCalcKey = useCallback((key: string) => {
@@ -90,6 +144,7 @@ export default function BalanceCards({
     const supabase = createClient();
 
     if (bankAction === "collectibles_add") {
+      setPrevColl(coll);
       const newColl = coll + amount;
       let q = supabase.from("balance_cards").update({ collectibles: newColl });
       if (facultyCode) q = q.eq("faculty_code", facultyCode);
@@ -97,6 +152,7 @@ export default function BalanceCards({
       await q;
       setColl(newColl);
     } else if (bankAction === "interest") {
+      setPrevBank({ bank, hand });
       const newBank = bank + amount;
       let selQ = supabase
         .from("balance_cards")
@@ -104,8 +160,10 @@ export default function BalanceCards({
       if (facultyCode) selQ = selQ.eq("faculty_code", facultyCode);
       else selQ = selQ.eq("campus_code", campusCode);
       const { data: balData } = await selQ.single();
-      const newInitialBank = ((balData?.initial_cash_on_bank as number) || 0) + amount;
-      const newInitialBal = ((balData?.initial_account_balance as number) || 0) + amount;
+      const newInitialBank =
+        ((balData?.initial_cash_on_bank as number) || 0) + amount;
+      const newInitialBal =
+        ((balData?.initial_account_balance as number) || 0) + amount;
       let updQ = supabase.from("balance_cards").update({
         cash_on_bank: newBank,
         initial_cash_on_bank: newInitialBank,
@@ -116,6 +174,7 @@ export default function BalanceCards({
       await updQ;
       setBank(newBank);
     } else {
+      setPrevBank({ bank, hand });
       let newBank = bank;
       let newHand = hand;
       if (bankAction === "deposit") {
@@ -143,13 +202,28 @@ export default function BalanceCards({
       deposit: `Deposited ${fmtAmt} to Cash on Bank`,
       withdrawal: `Withdrew ${fmtAmt} from Cash on Bank`,
     };
+    const desc = descriptions[bankAction ?? ""] ?? "";
     logActivity({
-      description: descriptions[bankAction ?? ""] ?? "",
+      description: desc,
       action: (bankAction ?? "").toUpperCase(),
       facultyCode,
       campusCode,
       targetTable: "balance_cards",
     }).catch(() => {});
+
+    if (bankAction === "collectibles_add") {
+      const saved = coll; // closure value before update
+      const id = toast.success(desc, {
+        action: { label: "Undo", onClick: () => executeUndoColl(saved) },
+      });
+      collToastId.current = id;
+    } else {
+      const saved = { bank, hand }; // closure values before update
+      const id = toast.success(desc, {
+        action: { label: "Undo", onClick: () => executeUndoBank(saved) },
+      });
+      bankToastId.current = id;
+    }
 
     setCalcSaving(false);
     closeCalc();
@@ -186,10 +260,10 @@ export default function BalanceCards({
     bankAction === "withdrawal"
       ? "Withdrawal"
       : bankAction === "interest"
-      ? "Interest Earnings"
-      : bankAction === "collectibles_add"
-      ? "Add to Collectibles"
-      : "Deposit";
+        ? "Interest Earnings"
+        : bankAction === "collectibles_add"
+          ? "Add to Collectibles"
+          : "Deposit";
 
   return (
     <>
@@ -202,7 +276,11 @@ export default function BalanceCards({
               onClick={() => setVisible((v) => !v)}
               className="text-gray-400 hover:text-gray-600 transition-colors"
             >
-              {visible ? <Eye className="w-8 h-8" /> : <EyeOff className="w-8 h-8" />}
+              {visible ? (
+                <Eye className="w-8 h-8" />
+              ) : (
+                <EyeOff className="w-8 h-8" />
+              )}
             </button>
           </div>
           <p className="text-4xl font-bold text-gray-900 mt-auto">
@@ -216,25 +294,39 @@ export default function BalanceCards({
             {/* Collectibles */}
             <div className="bg-white rounded-xl px-5 py-4 flex items-center justify-between flex-1 shadow-md">
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 font-medium mb-1">Collectibles</p>
+                <p className="text-xs text-gray-500 font-medium mb-1">
+                  Collectibles
+                </p>
                 <p className="text-lg font-bold text-gray-900">
                   {visible ? formatPeso(coll) : "₱ ••••••"}
                 </p>
               </div>
               {!isPublished && (
-                <button
-                  onClick={() => openCalc("collectibles_add")}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors self-start ml-2"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+                <div className="flex gap-1.5 self-start ml-2">
+                  <button
+                    onClick={handleUndoColl}
+                    disabled={prevColl === null}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title="Undo"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => openCalc("collectibles_add")}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-green-300 text-green-500 hover:bg-green-50 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               )}
             </div>
 
             {/* Cash On-Hand (read-only) */}
             <div className="bg-white rounded-xl px-5 py-4 flex items-center flex-1 shadow-md">
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 font-medium mb-1">Cash On-Hand</p>
+                <p className="text-xs text-gray-500 font-medium mb-1">
+                  Cash On-Hand
+                </p>
                 <p className="text-lg font-bold text-gray-900">
                   {visible ? formatPeso(hand) : "₱ ••••••"}
                 </p>
@@ -248,6 +340,14 @@ export default function BalanceCards({
               <p className="text-sm text-gray-500 font-medium">Cash On-Bank</p>
               {!isPublished && (
                 <div className="flex gap-1.5">
+                  <button
+                    onClick={handleUndoBank}
+                    disabled={prevBank === null}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title="Undo"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => openCalc("withdrawal")}
                     className="w-8 h-8 flex items-center justify-center rounded-lg border border-red-300 text-red-500 hover:bg-red-50 transition-colors text-base font-semibold leading-none"
@@ -271,7 +371,12 @@ export default function BalanceCards({
       </div>
 
       {/* Calculator Dialog */}
-      <Dialog open={calcOpen} onOpenChange={(o) => { if (!o) closeCalc(); }}>
+      <Dialog
+        open={calcOpen}
+        onOpenChange={(o) => {
+          if (!o) closeCalc();
+        }}
+      >
         <DialogContent className="w-72 font-lexend p-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
@@ -285,14 +390,21 @@ export default function BalanceCards({
               {(["deposit", "interest"] as const).map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => { setBankAction(tab); setCalcInput(""); }}
+                  onClick={() => {
+                    setBankAction(tab);
+                    setCalcInput("");
+                  }}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                     bankAction === tab
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  {tab === "deposit" ? <ArrowDownToLine className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
+                  {tab === "deposit" ? (
+                    <ArrowDownToLine className="w-3.5 h-3.5" />
+                  ) : (
+                    <TrendingUp className="w-3.5 h-3.5" />
+                  )}
                   {tab === "deposit" ? "Deposit" : "Interest Earnings"}
                 </button>
               ))}

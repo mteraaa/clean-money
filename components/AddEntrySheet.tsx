@@ -186,29 +186,31 @@ function EntryFormFields({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Receipt <span className="text-gray-400">(optional)</span></label>
-        <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
-          <input
-            type="file"
-            accept="image/*,.pdf"
-            className="hidden"
-            onChange={(e) => onChange({ ...form, receipt: e.target.files?.[0] ?? null })}
-          />
-          <span className="text-sm text-gray-400 truncate">
-            {form.receipt ? form.receipt.name : "Click to upload receipt…"}
-          </span>
-        </label>
-        {form.receipt && (
-          <button
-            type="button"
-            onClick={() => onChange({ ...form, receipt: null })}
-            className="text-xs text-red-400 hover:text-red-600 text-left"
-          >
-            Remove receipt
-          </button>
-        )}
-      </div>
+      {form.category === "expense" && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm text-gray-500">Receipt <span className="text-gray-400">(optional)</span></label>
+          <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              onChange={(e) => onChange({ ...form, receipt: e.target.files?.[0] ?? null })}
+            />
+            <span className="text-sm text-gray-400 truncate">
+              {form.receipt ? form.receipt.name : "Click to upload receipt…"}
+            </span>
+          </label>
+          {form.receipt && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...form, receipt: null })}
+              className="text-xs text-red-400 hover:text-red-600 text-left"
+            >
+              Remove receipt
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex items-end justify-between mt-2 pb-6">
         <div className="flex flex-col gap-1">
@@ -299,9 +301,9 @@ export default function AddEntrySheet(props: Props) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-105 font-lexend flex flex-col gap-0 px-8 py-8 sm:max-w-none!">
-        <SheetHeader className="p-0 mb-6">
-          <SheetTitle className="text-3xl font-bold text-gray-900">
+      <SheetContent className="w-105 font-lexend flex flex-col gap-0 px-8 pt-5 pb-8 sm:max-w-none!">
+        <SheetHeader className="p-0 mb-3">
+          <SheetTitle className="text-xl font-bold text-gray-900">
             {isEdit ? "Edit Entry" : "Add Entry"}
           </SheetTitle>
         </SheetHeader>
