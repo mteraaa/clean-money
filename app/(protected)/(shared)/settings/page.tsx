@@ -91,7 +91,7 @@ function ConfirmDialog({
                 if (e.key === "Enter") handleSubmit();
                 if (e.key === "Escape") onClose();
               }}
-              placeholder="••••••••"
+              placeholder=""
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
             <button
@@ -144,12 +144,11 @@ function UsernameCard({
     if (!userId) return;
     createClient()
       .from("users")
-      .select("full_name")
+      .select("username")
       .eq("auth_id", userId)
       .single()
       .then(({ data }) => {
-        setCurrent(data?.full_name ?? "");
-        setUsername(data?.full_name ?? "");
+        setCurrent(data?.username ?? "");
       });
   }, [userId]);
 
@@ -166,9 +165,10 @@ function UsernameCard({
 
     const { error } = await supabase
       .from("users")
-      .update({ full_name: username.trim() })
+      .update({ username: username.trim() })
       .eq("auth_id", userId);
     if (error) {
+      if (error.code === "23505") { toast.error("That username is already taken."); return; }
       toast.error("Failed to update username.");
       return;
     }
@@ -187,7 +187,7 @@ function UsernameCard({
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter username"
+            placeholder=""
             className="border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
           />
         </div>
@@ -221,7 +221,7 @@ function EmailCard({ userEmail }: { userEmail: string }) {
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
-    setEmail(userEmail);
+    // track current email for comparison only, don't pre-fill input
   }, [userEmail]);
 
   async function handleConfirm(password: string) {
@@ -256,7 +256,7 @@ function EmailCard({ userEmail }: { userEmail: string }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter email"
+            placeholder=""
             className="border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
           />
         </div>
@@ -411,7 +411,7 @@ function PasswordField({
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="••••••••"
+          placeholder=""
           className="w-full border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
         />
         <button
