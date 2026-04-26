@@ -1,8 +1,15 @@
+"use client";
+
+import AccountMonitoringCard from "@/components/admin/AccountMonitoringCard";
+import SemesterCard from "@/components/admin/SemesterCard";
+
 export default function AdminControlsPage() {
   return (
-    <div className="bg-[#f3f4f6] min-h-full">
-      <h1 className="text-2xl font-bold mb-4">Admin Controls</h1>
-      {/* Admin controls content goes here */}
+    <div className="bg-[#f3f4f6] min-h-full p-8 font-lexend">
+      <div className="grid grid-cols-2 gap-4 items-start">
+        <SemesterCard />
+        <AccountMonitoringCard />
+      </div>
     </div>
   );
 }
