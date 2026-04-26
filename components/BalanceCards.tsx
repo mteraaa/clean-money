@@ -63,6 +63,8 @@ export default function BalanceCards({
   } | null>(null);
   const collToastId = useRef<string | number | null>(null);
   const bankToastId = useRef<string | number | null>(null);
+  const collLogId = useRef<number | null>(null);
+  const bankLogId = useRef<number | null>(null);
 
   // Calculator flow
   const [bankAction, setBankAction] = useState<BankAction | null>(null);
@@ -89,6 +91,10 @@ export default function BalanceCards({
     if (facultyCode) q = q.eq("faculty_code", facultyCode);
     else q = q.eq("campus_code", campusCode);
     await q;
+    if (collLogId.current !== null) {
+      await supabase.from("activity_logs").delete().eq("id", collLogId.current);
+      collLogId.current = null;
+    }
     setColl(value);
     setPrevColl(null);
     collToastId.current = null;
@@ -102,13 +108,16 @@ export default function BalanceCards({
     if (facultyCode) q = q.eq("faculty_code", facultyCode);
     else q = q.eq("campus_code", campusCode);
     await q;
+    if (bankLogId.current !== null) {
+      await supabase.from("activity_logs").delete().eq("id", bankLogId.current);
+      bankLogId.current = null;
+    }
     setBank(value.bank);
     setHand(value.hand);
     setPrevBank(null);
     bankToastId.current = null;
   }
 
-  // Called from card button — also dismisses the toast
   async function handleUndoColl() {
     if (prevColl === null) return;
     if (collToastId.current !== null) toast.dismiss(collToastId.current);
@@ -203,22 +212,28 @@ export default function BalanceCards({
       withdrawal: `Withdrew ${fmtAmt} from Cash on Bank`,
     };
     const desc = descriptions[bankAction ?? ""] ?? "";
-    logActivity({
-      description: desc,
-      action: (bankAction ?? "").toUpperCase(),
-      facultyCode,
-      campusCode,
-      targetTable: "balance_cards",
-    }).catch(() => {});
-
     if (bankAction === "collectibles_add") {
-      const saved = coll; // closure value before update
+      const saved = coll;
+      logActivity({
+        description: desc,
+        action: (bankAction ?? "").toUpperCase(),
+        facultyCode,
+        campusCode,
+        targetTable: "balance_cards",
+      }).then((logId) => { collLogId.current = logId ?? null; }).catch(() => {});
       const id = toast.success(desc, {
         action: { label: "Undo", onClick: () => executeUndoColl(saved) },
       });
       collToastId.current = id;
     } else {
-      const saved = { bank, hand }; // closure values before update
+      const saved = { bank, hand };
+      logActivity({
+        description: desc,
+        action: (bankAction ?? "").toUpperCase(),
+        facultyCode,
+        campusCode,
+        targetTable: "balance_cards",
+      }).then((logId) => { bankLogId.current = logId ?? null; }).catch(() => {});
       const id = toast.success(desc, {
         action: { label: "Undo", onClick: () => executeUndoBank(saved) },
       });
