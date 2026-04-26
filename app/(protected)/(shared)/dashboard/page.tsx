@@ -23,6 +23,7 @@ export default function DashboardPage() {
     campus_code: string | null;
   } | null>(null);
 
+  const [isSemesterEnded, setIsSemesterEnded] = useState(false);
   const [semesterId, setSemesterId] = useState<number | null>(null);
   const [semesterMeta, setSemesterMeta] = useState<{
     name: string;
@@ -102,7 +103,8 @@ export default function DashboardPage() {
         .eq("is_active", true)
         .single();
 
-      if (!sem) return;
+      if (!sem) { setIsSemesterEnded(true); return; }
+      setIsSemesterEnded(false);
       setSemesterId(sem.id);
       const ayRaw = sem.academic_years;
       const yearLabel =
@@ -367,6 +369,7 @@ export default function DashboardPage() {
       <WelcomeCard
         name={userName}
         isPublished={!!publishedReport}
+        isSemesterEnded={isSemesterEnded}
         onAdd={() => setAddSheetOpen(true)}
         onPreview={() => setPreviewOpen(true)}
         onPublish={() => setPublishOpen(true)}
@@ -381,14 +384,14 @@ export default function DashboardPage() {
             collectibles={balance.collectibles}
             facultyCode={balance.faculty_code}
             campusCode={balance.campus_code}
-            isPublished={!!publishedReport}
+            isPublished={!!publishedReport || isSemesterEnded}
           />
           <div className="grid grid-cols-2 gap-4 mt-4">
             <ExpenseEntriesTable
               facultyCode={balance.faculty_code}
               campusCode={balance.campus_code}
               refreshKey={refreshKey}
-              isPublished={!!publishedReport}
+              isPublished={!!publishedReport || isSemesterEnded}
               onMutation={() => {
                 setRefreshKey((prev) => prev + 1);
                 refreshBalance();
@@ -398,7 +401,7 @@ export default function DashboardPage() {
               facultyCode={balance.faculty_code}
               campusCode={balance.campus_code}
               refreshKey={refreshKey}
-              isPublished={!!publishedReport}
+              isPublished={!!publishedReport || isSemesterEnded}
               onMutation={() => {
                 setRefreshKey((prev) => prev + 1);
                 refreshBalance();
