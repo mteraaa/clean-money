@@ -37,7 +37,7 @@ export default function ActivityLogPage() {
   }, []);
 
   return (
-    <div className="bg-[#f3f4f6] min-h-full p-8">
+    <div className="bg-[#f3f4f6] min-h-full p-4 md:p-8">
       <ActivityLogTable logs={logs} />
     </div>
   );

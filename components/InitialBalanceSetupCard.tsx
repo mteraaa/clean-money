@@ -57,7 +57,7 @@ export default function InitialBalanceSetupCard({ facultyCode, campusCode, semes
   return (
     <div className="bg-white rounded-xl shadow-md px-6 py-5 font-lexend mb-4">
       <p className="text-sm font-semibold text-gray-700 mb-4">Set Initial Balance</p>
-      <form onSubmit={handleSubmit} className="flex gap-4 items-end">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="flex flex-col gap-1 flex-1">
           <label className="text-xs text-gray-500">Cash on Bank</label>
           <input
