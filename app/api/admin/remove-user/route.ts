@@ -29,14 +29,6 @@ export async function DELETE(req: NextRequest) {
       .single();
 
     if (publicUser) {
-      if (publicUser.faculty_code) {
-        await admin.from("balance_cards").delete().eq("faculty_code", publicUser.faculty_code);
-        await admin.from("entries").delete().eq("faculty_code", publicUser.faculty_code);
-      } else if (publicUser.campus_code) {
-        await admin.from("balance_cards").delete().eq("campus_code", publicUser.campus_code).is("faculty_code", null);
-        await admin.from("entries").delete().eq("campus_code", publicUser.campus_code).is("faculty_code", null);
-      }
-
       const { error: publicError } = await admin.from("users").delete().eq("auth_id", authId);
       if (publicError) return NextResponse.json({ error: publicError.message }, { status: 400 });
     }
