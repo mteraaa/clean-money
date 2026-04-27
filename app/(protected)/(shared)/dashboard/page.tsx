@@ -7,6 +7,7 @@ import WelcomeCard from "@/components/WelcomeCard";
 import IncomeEntriesTable from "@/components/IncomeEntriesTable";
 import ExpenseEntriesTable from "@/components/ExpenseEntriesTable";
 import AddEntrySheet, { FormState } from "@/components/AddEntrySheet";
+import InitialBalanceSetupCard from "@/components/InitialBalanceSetupCard";
 import PDFViewerCard from "@/components/PDFViewerCard";
 import PublishDialog from "@/components/PublishDialog";
 import { logActivity } from "@/utils/logActivity";
@@ -23,6 +24,7 @@ export default function DashboardPage() {
     campus_code: string | null;
   } | null>(null);
 
+  const [hasBalanceRow, setHasBalanceRow] = useState(false);
   const [isSemesterEnded, setIsSemesterEnded] = useState(false);
   const [semesterId, setSemesterId] = useState<number | null>(null);
   const [semesterMeta, setSemesterMeta] = useState<{
@@ -90,6 +92,7 @@ export default function DashboardPage() {
       }
 
       const { data } = await balanceQuery.maybeSingle();
+      setHasBalanceRow(!!data);
       setBalance({
         cash_on_bank: data?.cash_on_bank ?? 0,
         cash_on_hand: data?.cash_on_hand ?? 0,
@@ -376,40 +379,51 @@ export default function DashboardPage() {
         onPublish={() => setPublishOpen(true)}
         onUnpublish={() => setUnpublishOpen(true)}
       />
+      {balance && !hasBalanceRow && (
+        <InitialBalanceSetupCard
+          facultyCode={balance.faculty_code}
+          campusCode={balance.campus_code}
+          semesterId={semesterId!}
+          onComplete={(values) => {
+            setBalance((prev) => (prev ? { ...prev, ...values } : prev));
+            setHasBalanceRow(true);
+          }}
+        />
+      )}
+      {balance && hasBalanceRow && (
+        <BalanceCards
+          key={balanceKey}
+          cashOnBank={balance.cash_on_bank}
+          cashOnHand={balance.cash_on_hand}
+          collectibles={balance.collectibles}
+          facultyCode={balance.faculty_code}
+          campusCode={balance.campus_code}
+          isPublished={!!publishedReport || isSemesterEnded}
+        />
+      )}
       {balance && (
-        <>
-          <BalanceCards
-            key={balanceKey}
-            cashOnBank={balance.cash_on_bank}
-            cashOnHand={balance.cash_on_hand}
-            collectibles={balance.collectibles}
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <ExpenseEntriesTable
             facultyCode={balance.faculty_code}
             campusCode={balance.campus_code}
+            refreshKey={refreshKey}
             isPublished={!!publishedReport || isSemesterEnded}
+            onMutation={() => {
+              setRefreshKey((prev) => prev + 1);
+              refreshBalance();
+            }}
           />
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <ExpenseEntriesTable
-              facultyCode={balance.faculty_code}
-              campusCode={balance.campus_code}
-              refreshKey={refreshKey}
-              isPublished={!!publishedReport || isSemesterEnded}
-              onMutation={() => {
-                setRefreshKey((prev) => prev + 1);
-                refreshBalance();
-              }}
-            />
-            <IncomeEntriesTable
-              facultyCode={balance.faculty_code}
-              campusCode={balance.campus_code}
-              refreshKey={refreshKey}
-              isPublished={!!publishedReport || isSemesterEnded}
-              onMutation={() => {
-                setRefreshKey((prev) => prev + 1);
-                refreshBalance();
-              }}
-            />
-          </div>
-        </>
+          <IncomeEntriesTable
+            facultyCode={balance.faculty_code}
+            campusCode={balance.campus_code}
+            refreshKey={refreshKey}
+            isPublished={!!publishedReport || isSemesterEnded}
+            onMutation={() => {
+              setRefreshKey((prev) => prev + 1);
+              refreshBalance();
+            }}
+          />
+        </div>
       )}
 
       <PDFViewerCard open={previewOpen} onClose={() => setPreviewOpen(false)} />
