@@ -70,7 +70,7 @@ export default function ReceiptFolderPage() {
   }, [id]);
 
   return (
-    <div className="bg-[#f3f4f6] min-h-full p-8">
+    <div className="bg-[#f3f4f6] min-h-full p-4 md:p-8">
       <button
         onClick={() => router.back()}
         className="flex items-center gap-1 text-sm font-inter text-gray-500 hover:text-gray-800 mb-4"

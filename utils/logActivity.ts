@@ -30,15 +30,20 @@ export async function logActivity({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from("activity_logs").insert({
-    user_id: user.id,
-    faculty_code: facultyCode ?? null,
-    campus_code: campusCode ?? null,
-    module,
-    action,
-    description,
-    target_table: targetTable ?? null,
-    target_id: targetId ?? null,
-    logged_at: new Date().toISOString(),
-  });
+  const { data } = await supabase
+    .from("activity_logs")
+    .insert({
+      user_id: user.id,
+      faculty_code: facultyCode ?? null,
+      campus_code: campusCode ?? null,
+      module,
+      action,
+      description,
+      target_table: targetTable ?? null,
+      target_id: targetId ?? null,
+      logged_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  return data?.id as number | undefined;
 }
