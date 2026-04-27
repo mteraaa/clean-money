@@ -12,14 +12,14 @@ export default function WelcomeCard({ name, isPublished, isSemesterEnded, onAdd,
   const locked = isPublished || isSemesterEnded;
 
   return (
-    <div className="bg-white rounded-xl shadow-md px-6 py-4 flex items-center justify-between font-lexend mb-4">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-lexend-exa font-bold text-gray-900 uppercase">{name}</h1>
+    <div className="bg-white rounded-xl shadow-md px-4 py-3 md:px-6 md:py-4 flex flex-wrap items-center justify-between gap-3 font-lexend mb-4">
+      <div className="flex items-center gap-3 min-w-0">
+        <h1 className="text-base md:text-lg font-lexend-exa font-bold text-gray-900 uppercase truncate">{name}</h1>
         {isSemesterEnded && !isPublished && (
-          <span className="text-xs font-medium bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full">Semester Ended</span>
+          <span className="text-xs font-medium bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full shrink-0">Semester Ended</span>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={onAdd}
           disabled={locked}
