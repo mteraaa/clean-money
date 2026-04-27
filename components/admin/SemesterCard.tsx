@@ -59,6 +59,9 @@ export default function SemesterCard() {
     await supabase.from("semesters").update({ is_active: false }).eq("is_active", true);
     await supabase.from("academic_years").update({ is_active: false }).eq("is_active", true);
 
+    // Clear activity logs from the previous semester
+    await supabase.from("activity_logs").delete().gte("id", 0);
+
     // Find or create academic year
     let { data: ay } = await supabase.from("academic_years").select("id").eq("year_label", newYearLabel).single();
     if (!ay) {
