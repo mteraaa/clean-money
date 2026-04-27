@@ -12,9 +12,7 @@ export default function ActivityLogPage() {
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data: userData } = await supabase
