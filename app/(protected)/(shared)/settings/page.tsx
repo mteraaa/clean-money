@@ -19,8 +19,8 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="bg-[#f3f4f6] h-full p-8 font-lexend">
-      <div className="grid grid-cols-2 gap-4 items-start">
+    <div className="bg-[#f3f4f6] h-full p-4 md:p-8 font-lexend">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
           <UsernameCard userId={userId} userEmail={userEmail} />
           <EmailCard userEmail={userEmail} />
