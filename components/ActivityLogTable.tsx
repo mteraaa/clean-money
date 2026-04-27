@@ -29,8 +29,8 @@ export default function ActivityLogTable({ logs }: { logs: Log[] }) {
         <thead>
           <tr className="bg-[#E5E7EB] text-gray-700">
             <th className="text-left px-6 py-3 font-bold">Description</th>
-            <th className="text-left px-4 py-3 font-bold w-32">Time</th>
-            <th className="text-left px-4 py-3 font-bold w-44">Date</th>
+            <th className="text-left px-4 py-3 font-bold w-32 hidden md:table-cell">Time</th>
+            <th className="text-left px-4 py-3 font-bold w-44 hidden md:table-cell">Date</th>
           </tr>
         </thead>
         <tbody>
@@ -43,9 +43,14 @@ export default function ActivityLogTable({ logs }: { logs: Log[] }) {
           ) : (
             logs.map((log) => (
               <tr key={log.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-3 text-gray-900">{log.description}</td>
-                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatTime(log.logged_at)}</td>
-                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(log.logged_at)}</td>
+                <td className="px-6 py-3 text-gray-900">
+                  {log.description}
+                  <span className="block md:hidden text-xs text-gray-400 mt-0.5">
+                    {formatDate(log.logged_at)} · {formatTime(log.logged_at)}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{formatTime(log.logged_at)}</td>
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap hidden md:table-cell">{formatDate(log.logged_at)}</td>
               </tr>
             ))
           )}
