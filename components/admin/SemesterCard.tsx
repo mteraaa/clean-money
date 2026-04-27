@@ -59,6 +59,23 @@ export default function SemesterCard() {
     await supabase.from("semesters").update({ is_active: false }).eq("is_active", true);
     await supabase.from("academic_years").update({ is_active: false }).eq("is_active", true);
 
+    // Carry over current balances as initial values for the new semester
+    const { data: cards } = await supabase
+      .from("balance_cards")
+      .select("id, cash_on_bank, cash_on_hand, collectibles");
+    if (cards && cards.length > 0) {
+      await Promise.all(
+        cards.map((card) =>
+          supabase.from("balance_cards").update({
+            initial_cash_on_bank: card.cash_on_bank,
+            initial_cash_on_hand: card.cash_on_hand,
+            initial_collectibles: card.collectibles,
+            initial_account_balance: card.cash_on_bank + card.cash_on_hand,
+          }).eq("id", card.id)
+        )
+      );
+    }
+
     // Clear activity logs from the previous semester
     await supabase.from("activity_logs").delete().gte("id", 0);
 
