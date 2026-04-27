@@ -89,13 +89,14 @@ export default function DashboardPage() {
         balanceQuery = balanceQuery.eq("campus_code", userData.campus_code);
       }
 
-      const { data } = await balanceQuery.single();
-      if (data)
-        setBalance({
-          ...data,
-          faculty_code: userData.faculty_code,
-          campus_code: userData.campus_code,
-        });
+      const { data } = await balanceQuery.maybeSingle();
+      setBalance({
+        cash_on_bank: data?.cash_on_bank ?? 0,
+        cash_on_hand: data?.cash_on_hand ?? 0,
+        collectibles: data?.collectibles ?? 0,
+        faculty_code: userData.faculty_code,
+        campus_code: userData.campus_code,
+      });
 
       const { data: sem } = await supabase
         .from("semesters")
