@@ -30,14 +30,14 @@ export default function BalanceCards({ isPublished = false, ...rest }: Props) {
 
   return (
     <>
-      <div className="flex gap-4 font-lexend">
+      <div className="flex flex-col gap-4 font-lexend sm:flex-row">
         <TotalBalanceCard
           total={bank + hand}
           visible={visible}
           onToggle={() => setVisible((v) => !v)}
         />
 
-        <div className="flex gap-2 w-2/4">
+        <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-2/4">
           <div className="flex flex-col gap-4 flex-1">
             <CollectiblesCard
               coll={coll}

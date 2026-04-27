@@ -52,7 +52,7 @@ export function useBalanceActions({
     const supabase = createClient();
     let q = supabase.from("balance_cards").update({ collectibles: value });
     if (facultyCode) q = q.eq("faculty_code", facultyCode);
-    else q = q.eq("campus_code", campusCode!);
+    else q = q.eq("campus_code", campusCode!).is("faculty_code", null);
     await q;
     if (collLogId.current !== null) {
       await supabase.from("activity_logs").delete().eq("id", collLogId.current);
@@ -67,7 +67,7 @@ export function useBalanceActions({
     const supabase = createClient();
     let q = supabase.from("balance_cards").update({ cash_on_bank: value.bank, cash_on_hand: value.hand });
     if (facultyCode) q = q.eq("faculty_code", facultyCode);
-    else q = q.eq("campus_code", campusCode!);
+    else q = q.eq("campus_code", campusCode!).is("faculty_code", null);
     await q;
     if (bankLogId.current !== null) {
       await supabase.from("activity_logs").delete().eq("id", bankLogId.current);
@@ -110,7 +110,7 @@ export function useBalanceActions({
       const newColl = coll + amount;
       let q = supabase.from("balance_cards").update({ collectibles: newColl });
       if (facultyCode) q = q.eq("faculty_code", facultyCode);
-      else q = q.eq("campus_code", campusCode!);
+      else q = q.eq("campus_code", campusCode!).is("faculty_code", null);
       await q;
       setColl(newColl);
     } else if (bankAction === "interest") {
@@ -118,7 +118,7 @@ export function useBalanceActions({
       const newBank = bank + amount;
       let selQ = supabase.from("balance_cards").select("initial_cash_on_bank, initial_account_balance");
       if (facultyCode) selQ = selQ.eq("faculty_code", facultyCode);
-      else selQ = selQ.eq("campus_code", campusCode!);
+      else selQ = selQ.eq("campus_code", campusCode!).is("faculty_code", null);
       const { data: balData } = await selQ.single();
       let updQ = supabase.from("balance_cards").update({
         cash_on_bank: newBank,
@@ -126,7 +126,7 @@ export function useBalanceActions({
         initial_account_balance: ((balData?.initial_account_balance as number) || 0) + amount,
       });
       if (facultyCode) updQ = updQ.eq("faculty_code", facultyCode);
-      else updQ = updQ.eq("campus_code", campusCode!);
+      else updQ = updQ.eq("campus_code", campusCode!).is("faculty_code", null);
       await updQ;
       setBank(newBank);
     } else {
@@ -135,7 +135,7 @@ export function useBalanceActions({
       const newHand = bankAction === "deposit" ? hand - amount : hand + amount;
       let q = supabase.from("balance_cards").update({ cash_on_bank: newBank, cash_on_hand: newHand });
       if (facultyCode) q = q.eq("faculty_code", facultyCode);
-      else q = q.eq("campus_code", campusCode!);
+      else q = q.eq("campus_code", campusCode!).is("faculty_code", null);
       await q;
       setBank(newBank);
       setHand(newHand);

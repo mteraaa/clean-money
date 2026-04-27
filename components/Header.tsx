@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 type HeaderData = {
   org_name: string;
@@ -71,16 +72,19 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="bg-[#fafafa] px-10 py-8 shadow-[0px_4px_10px_0px_rgba(74,85,104,0.2)] relative z-10">
-      <div className="flex items-baseline gap-3">
-        <span className="font-lexend-exa font-bold text-xl tracking-wide uppercase">
-          VSU - {data?.org_name ?? ""}
-        </span>
-        {data && (
-          <span className="text-gray-400 text-sm font-inter">
-            {data.year_label} | {data.semester_name}
+    <header className="bg-[#fafafa] px-4 py-4 md:px-10 md:py-6 shadow-[0px_4px_10px_0px_rgba(74,85,104,0.2)] relative z-10">
+      <div className="flex items-center gap-3">
+        <SidebarTrigger className="md:hidden shrink-0" />
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
+          <span className="font-lexend-exa font-bold text-base md:text-xl tracking-wide uppercase truncate">
+            VSU - {data?.org_name ?? ""}
           </span>
-        )}
+          {data && (
+            <span className="text-gray-400 text-xs md:text-sm font-inter shrink-0">
+              {data.year_label} | {data.semester_name}
+            </span>
+          )}
+        </div>
       </div>
     </header>
   );

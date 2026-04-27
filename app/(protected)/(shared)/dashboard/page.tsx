@@ -71,7 +71,7 @@ export default function DashboardPage() {
       )}
 
       {balance && (
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
           <ExpenseEntriesTable
             facultyCode={balance.faculty_code}
             campusCode={balance.campus_code}

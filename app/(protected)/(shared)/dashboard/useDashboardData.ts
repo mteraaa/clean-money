@@ -52,7 +52,11 @@ export function useDashboardData() {
       if (userData.faculty_code) {
         balanceQuery = balanceQuery.eq("faculty_code", userData.faculty_code);
       } else {
-        balanceQuery = balanceQuery.eq("campus_code", userData.campus_code);
+        // campus_code is set on FC rows too, so filter faculty_code IS NULL
+        // to avoid picking up an FC balance row when the campus row is missing
+        balanceQuery = balanceQuery
+          .eq("campus_code", userData.campus_code)
+          .is("faculty_code", null);
       }
       const { data: balanceData } = await balanceQuery.maybeSingle();
       setHasBalanceRow(!!balanceData);
@@ -110,7 +114,7 @@ export function useDashboardData() {
     const supabase = createClient();
     let q = supabase.from("balance_cards").select("cash_on_bank, cash_on_hand, collectibles");
     if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
-    else q = q.eq("campus_code", balance.campus_code);
+    else q = q.eq("campus_code", balance.campus_code).is("faculty_code", null);
     const { data, error } = await q.single();
     if (error) console.error("Balance fetch error:", error.message);
     if (data) setBalance((prev) => (prev ? { ...prev, ...data } : prev));

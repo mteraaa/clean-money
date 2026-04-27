@@ -57,7 +57,7 @@ export default function AppSidebar() {
   return (
     <Sidebar
       className="shadow-[4px_0px_10px_0px_rgba(74,85,104,0.2)] overflow-hidden relative z-20"
-      collapsible="none"
+      collapsible="offcanvas"
     >
       <SidebarHeader>
         <img
