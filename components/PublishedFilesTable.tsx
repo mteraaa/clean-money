@@ -309,7 +309,7 @@ export default function PublishedFilesTable({ files, onFolderClick, onDelete }: 
                 </div>
               </TableHead>
               <TableHead
-                className="font-inter font-bold text-gray-800 py-3 px-4 cursor-pointer select-none"
+                className="font-inter font-bold text-gray-800 py-3 px-4 cursor-pointer select-none hidden md:table-cell"
                 onClick={() => handleSort("published_at")}
               >
                 <div className="flex items-center gap-1">
@@ -363,10 +363,15 @@ export default function PublishedFilesTable({ files, onFolderClick, onDelete }: 
                 <TableCell className="font-inter text-sm py-3 px-4">
                   <div className="flex items-center gap-2">
                     <FileIcon mimeType={file.mime_type} />
-                    {file.title}
+                    <div className="min-w-0">
+                      <span className="block truncate">{file.title}</span>
+                      <span className="block md:hidden text-xs text-gray-400 mt-0.5">
+                        {formatDate(file.published_at)}
+                      </span>
+                    </div>
                   </div>
                 </TableCell>
-                <TableCell className="font-inter text-sm py-3 px-4">
+                <TableCell className="font-inter text-sm py-3 px-4 hidden md:table-cell">
                   {formatDate(file.published_at)}
                 </TableCell>
                 <TableCell />
