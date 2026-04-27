@@ -13,7 +13,7 @@ export default function TotalBalanceCard({
   onToggle: () => void;
 }) {
   return (
-    <div className="w-2/4 bg-white rounded-xl p-6 flex flex-col justify-between min-h-35 shadow-md">
+    <div className="w-full sm:w-2/4 bg-white rounded-xl p-6 flex flex-col justify-between min-h-35 shadow-md">
       <div className="flex justify-between items-start">
         <p className="text-base text-gray-500 font-medium">Total Balance</p>
         <button
