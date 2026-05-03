@@ -21,9 +21,9 @@ export default function CashOnBankCard({
   onWithdrawal: () => void;
 }) {
   return (
-    <div className="flex-1 bg-white rounded-xl px-5 py-4 flex flex-col justify-between shadow-md min-h-35">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 font-medium">Cash On-Bank</p>
+    <div className="flex-1 bg-white rounded-xl px-5 py-4 flex flex-col justify-between shadow-md">
+      <div className="flex items-start justify-between">
+        <p className="text-xs text-gray-500 font-medium">Cash On-Bank</p>
         {!isPublished && (
           <div className="flex gap-1.5">
             <button
@@ -49,7 +49,7 @@ export default function CashOnBankCard({
           </div>
         )}
       </div>
-      <p className="text-3xl font-bold text-gray-900 mt-auto">
+      <p className="text-lg font-bold text-gray-900">
         {visible ? formatPeso(bank) : "₱ ••••••"}
       </p>
     </div>
