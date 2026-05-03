@@ -39,6 +39,7 @@ function entryToForm(entry: Entry): FormState {
   const { category, description, unit_price, quantity, entry_date } = entry;
   let description_preset = "";
   let description_other = "";
+  let payee = "";
 
   if (category === "income") {
     if (INCOME_DESCRIPTIONS.includes(description) && description !== "Others") {
@@ -50,10 +51,17 @@ function entryToForm(entry: Entry): FormState {
   } else {
     if (description.startsWith("Special Projects/Fund Raising")) {
       description_preset = "Special Projects/Fund Raising";
-      description_other = description.replace(
-        "Special Projects/Fund Raising — ",
-        "",
-      );
+      description_other = description.replace("Special Projects/Fund Raising — ", "");
+    } else if (description.startsWith("Reimbursement")) {
+      description_preset = "Reimbursement";
+      const inner = description.replace("Reimbursement — ", "");
+      const parts = inner.split(" — ");
+      if (parts.length >= 2) {
+        payee = parts[0];
+        description_other = parts.slice(1).join(" — ");
+      } else {
+        description_other = inner;
+      }
     } else {
       description_preset = "Others";
       description_other = description;
@@ -64,6 +72,7 @@ function entryToForm(entry: Entry): FormState {
     date: entry_date,
     description_preset,
     description_other,
+    payee,
     category,
     unit_price: String(unit_price),
     quantity: String(quantity),
@@ -227,7 +236,9 @@ export default function CategoryEntriesTable({
     const editNeedsExtra =
       editForm.description_preset === "Others" ||
       (editForm.category === "expense" &&
-        editForm.description_preset === "Special Projects/Fund Raising");
+        editForm.description_preset === "Special Projects/Fund Raising") ||
+      (editForm.category === "expense" &&
+        editForm.description_preset === "Reimbursement");
     const finalDescription = editNeedsExtra
       ? editForm.description_other
       : editForm.description_preset;
