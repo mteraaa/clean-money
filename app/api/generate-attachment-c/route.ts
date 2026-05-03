@@ -1,118 +1,46 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import fs from "fs";
 import path from "path";
+import {
+  BLACK,
+  fmt,
+  type DrawPage,
+  type PageSetupOpts,
+  centerText,
+  drawTable,
+  setupPage,
+  ensurePage,
+  calcTableH,
+  drawPreparedBy,
+} from "./pdf-helpers";
+import {
+  PRESET_ORDER,
+  type ExpEntry,
+  STD_COLS,
+  REIMB_COLS,
+  STD_HEADERS,
+  REIMB_HEADERS,
+  buildRows,
+  groupEntries,
+} from "./data";
 
-const BLACK = rgb(0, 0, 0);
-const WHITE = rgb(1, 1, 1);
-const HEADER_GREEN = rgb(27 / 255, 77 / 255, 48 / 255); // VSU/SEB dark forest green
-const ROW_H = 17;
-
-function fmt(n: number) {
-  return n.toLocaleString("en-PH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function fmtDate(dateStr: string) {
-  const [y, m, d] = (dateStr ?? "").split("-");
-  if (!y || !m || !d) return dateStr ?? "";
-  return `${m}-${d}-${y}`;
-}
-
-type DrawPage = ReturnType<PDFDocument["getPages"]>[0];
-type Font = Awaited<ReturnType<PDFDocument["embedFont"]>>;
-
-function centerText(
-  page: DrawPage,
-  text: string,
-  y: number,
-  pageWidth: number,
-  font: Font,
-  size: number,
-) {
-  const w = font.widthOfTextAtSize(text, size);
-  page.drawText(text, { x: (pageWidth - w) / 2, y, size, font, color: BLACK });
-}
-
-function drawTable(
-  page: DrawPage,
-  x: number,
-  y: number,
-  colWidths: number[],
-  rows: string[][],
-  font: Font,
-  boldFont: Font,
-  headerRows = 1,
-  rightAlignCols: number[] = [],
-) {
-  const totalW = colWidths.reduce((a, b) => a + b, 0);
-  const totalH = rows.length * ROW_H;
-
-  page.drawRectangle({
-    x,
-    y: y - totalH,
-    width: totalW,
-    height: totalH,
-    borderColor: BLACK,
-    borderWidth: 0.75,
-    color: WHITE,
-  });
-
-  for (let r = 0; r < rows.length; r++) {
-    const rowTop = y - r * ROW_H;
-
-    if (r > 0) {
-      page.drawLine({
-        start: { x, y: rowTop },
-        end: { x: x + totalW, y: rowTop },
-        color: BLACK,
-        thickness: 0.5,
-      });
-    }
-
-    let cx = x;
-    const f = r < headerRows ? boldFont : font;
-    for (let c = 0; c < rows[r].length; c++) {
-      if (c > 0) {
-        page.drawLine({
-          start: { x: cx, y: rowTop },
-          end: { x: cx, y: rowTop - ROW_H },
-          color: BLACK,
-          thickness: 0.5,
-        });
-      }
-      const cellText = rows[r][c] ?? "";
-      const sz = 7.5;
-      const textW = f.widthOfTextAtSize(cellText, sz);
-      const isCenter = r < headerRows;
-      const isRight = rightAlignCols.includes(c) && r >= headerRows;
-      const tx = isRight
-        ? cx + colWidths[c] - textW - 4
-        : isCenter
-          ? cx + (colWidths[c] - textW) / 2
-          : cx + 4;
-      page.drawText(cellText, {
-        x: Math.max(cx + 2, tx),
-        y: rowTop - ROW_H + 5,
-        size: sz,
-        font: f,
-        color: BLACK,
-      });
-      cx += colWidths[c];
-    }
-  }
-}
+const LEFT = 40,
+  CONTENT_TOP = 680,
+  CONTENT_BOT = 80;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-
-  const attachCTitle = searchParams.get("attachCTitle") ?? "";
-  const table1Name =
-    searchParams.get("table1Name") ??
-    "TABLE 1. YEAR-END BREAKDOWN OF EXPENSES";
+  const attachCTitle = searchParams.get("attachCTitle") || "ATTACHMENT C";
+  const preparedByName = searchParams.get("preparedByName") ?? "";
+  const preparedByPosition = searchParams.get("preparedByPosition") ?? "";
+  let tableTitles: Record<string, string> = {};
+  try {
+    tableTitles = JSON.parse(searchParams.get("tableTitles") ?? "{}");
+  } catch {
+    /* empty */
+  }
 
   const supabase = await createClient();
   const {
@@ -126,9 +54,7 @@ export async function GET(request: Request) {
     .eq("auth_id", user.id)
     .single();
   if (!userData) return new NextResponse("Not found", { status: 404 });
-
   const { faculty_code, campus_code } = userData;
-  const email = user.email ?? "";
 
   let facultyName = "";
   if (faculty_code) {
@@ -149,12 +75,11 @@ export async function GET(request: Request) {
 
   const { data: sem } = await supabase
     .from("semesters")
-    .select("id, semester_name, academic_years(year_label)")
+    .select("id")
     .eq("is_active", true)
     .single();
   if (!sem) return new NextResponse("No active semester", { status: 404 });
 
-  // Expense entries for Table 1
   let expQ = supabase
     .from("entries")
     .select(
@@ -165,112 +90,95 @@ export async function GET(request: Request) {
     .order("entry_date", { ascending: true });
   if (faculty_code) expQ = expQ.eq("faculty_code", faculty_code);
   else expQ = expQ.eq("campus_code", campus_code!);
-  const { data: expenseEntries } = await expQ;
+  const { data: raw } = await expQ;
 
-  // Semester/year label for title fallback
-  const yearLabel =
-    (sem.academic_years as { year_label?: string } | null)?.year_label ?? "";
-  const semName = (sem.semester_name ?? "").replace(/\s*semester\s*/i, "").trim();
-
-  // Load template
-  const templatePath = path.join(
-    process.cwd(),
-    "public",
-    "attachment-c-template.pdf",
+  const groups = groupEntries((raw ?? []) as ExpEntry[]);
+  const activePresets = PRESET_ORDER.filter(
+    (p) => (groups.get(p)?.length ?? 0) > 0,
   );
-  const templateBytes = fs.readFileSync(templatePath);
-  const pdfDoc = await PDFDocument.load(templateBytes);
 
+  const pdfDoc = await PDFDocument.load(
+    fs.readFileSync(
+      path.join(process.cwd(), "public", "attachment-c-template.pdf"),
+    ),
+  );
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const montserratBytes = fs.readFileSync(
-    path.join(process.cwd(), "public", "fonts", "Montserrat-Bold.ttf"),
-  );
-  const montserrat = await pdfDoc.embedFont(montserratBytes);
+  const { width } = pdfDoc.getPages()[0].getSize();
+  const CONTENT_W = width - 80;
 
-  const pages = pdfDoc.getPages();
-  const page = pages[0];
-  const { width } = page.getSize();
+  const pageOpts: PageSetupOpts = {
+    facultyName,
+    font,
+    boldFont,
+    left: LEFT,
+    contentW: CONTENT_W,
+    contentTop: CONTENT_TOP,
+    contentBot: CONTENT_BOT,
+  };
+  const setup = (pg: DrawPage) => setupPage(pg, pageOpts);
 
-  const LEFT = 40;
-  const RIGHT = width - 40;
-  const CONTENT_W = RIGHT - LEFT;
-  const CONTENT_TOP = 755;
-  const CONTENT_BOT = 80;
+  let pageIndex = 0,
+    curY = CONTENT_TOP;
+  let currentPage = pdfDoc.getPages()[0];
+  setup(currentPage);
 
-  function draw(
-    pg: DrawPage,
-    text: string,
-    x: number,
-    y: number,
-    f: Font = font,
-    size = 9,
-  ) {
-    pg.drawText(text, { x, y, size, font: f, color: BLACK });
+  async function ensureSpace(neededH: number) {
+    if (curY - neededH < CONTENT_BOT + 10) {
+      currentPage = await ensurePage(pdfDoc, ++pageIndex);
+      setup(currentPage);
+      curY = CONTENT_TOP;
+    }
   }
 
-  // ── Dynamic header/footer overlay ──
-  // Faculty name in header (above STUDENT ELECTION BOARD)
-  page.drawRectangle({ x: 200, y: 800, width: 330, height: 24, color: WHITE });
-  page.drawText(facultyName.toUpperCase(), {
-    x: 205,
-    y: 804,
-    size: 14,
-    font: montserrat,
-    color: HEADER_GREEN,
-  });
-
-  // Faculty name in footer (above STUDENT ELECTION BOARD)
-  page.drawRectangle({ x: 44, y: 50, width: 200, height: 12, color: WHITE });
-  draw(page, facultyName, 45, 51, boldFont, 7);
-
-  // Email in footer
-  page.drawRectangle({ x: 44, y: 22, width: 200, height: 10, color: WHITE });
-  draw(page, email, 79, 23, font, 7);
-
-  // ── Clear content area ──
-  page.drawRectangle({
-    x: LEFT,
-    y: CONTENT_BOT,
-    width: CONTENT_W,
-    height: CONTENT_TOP - CONTENT_BOT,
-    color: WHITE,
-  });
-
-  let curY = CONTENT_TOP;
-
-  // "ATTACHMENT C"
-  const mainTitle = attachCTitle || "ATTACHMENT C";
-  centerText(page, mainTitle, curY, width, boldFont, 11);
+  centerText(currentPage, attachCTitle, curY, width, boldFont, 11);
   curY -= 22;
 
-  // ── Table 1: Expense breakdown ──
-  if (table1Name) {
-    draw(page, table1Name, LEFT, curY, boldFont, 8.5);
+  for (let ti = 0; ti < activePresets.length; ti++) {
+    const preset = activePresets[ti];
+    const entries = groups.get(preset) ?? [];
+    const isReimb = preset === "Reimbursement";
+    const colWidths = isReimb ? REIMB_COLS : STD_COLS;
+    const total = entries.reduce((s, e) => s + (Number(e.total_price) || 0), 0);
+    const tableRows: string[][] = [
+      isReimb ? REIMB_HEADERS : STD_HEADERS,
+      ...buildRows(entries, isReimb),
+      ["TOTAL", ...Array(colWidths.length - 2).fill(""), fmt(total)],
+    ];
+    const tableH = calcTableH(tableRows, colWidths, font);
+    await ensureSpace(16 + tableH);
+    currentPage.drawText(
+      tableTitles[preset] ?? `TABLE ${ti + 1}. ${preset.toUpperCase()}`,
+      { x: LEFT, y: curY, size: 8.5, font: boldFont, color: BLACK },
+    );
     curY -= 16;
+    drawTable(
+      currentPage,
+      LEFT + (CONTENT_W - colWidths.reduce((a, b) => a + b, 0)) / 2,
+      curY,
+      colWidths,
+      tableRows,
+      font,
+      boldFont,
+      isReimb ? [3] : [3, 4, 5],
+    );
+    curY -= tableH + 20;
   }
 
-  const colT1 = [70, 80, 200, 65, 80];
-  const t1X = LEFT + (CONTENT_W - colT1.reduce((a, b) => a + b, 0)) / 2;
-
-  const expRows = (expenseEntries ?? []).map((e) => [
-    fmtDate(e.entry_date ?? ""),
-    String(e.control_number ?? ""),
-    e.description ?? "",
-    fmt(Number(e.unit_price) || 0),
-    fmt(Number(e.total_price) || 0),
-  ]);
-  const totalExpenses = (expenseEntries ?? []).reduce(
-    (s, e) => s + (Number(e.total_price) || 0),
-    0,
+  await ensureSpace(70);
+  const orgCode = faculty_code ?? campus_code ?? "";
+  const designation = [orgCode, orgCode ? "- SEB" : "SEB", preparedByPosition]
+    .filter(Boolean)
+    .join(" ");
+  drawPreparedBy(
+    currentPage,
+    preparedByName,
+    designation,
+    LEFT,
+    curY - 40,
+    font,
+    boldFont,
   );
-
-  const t1Rows: string[][] = [
-    ["Date", "OR/TR No.", "Description", "Unit Price", "Amount"],
-    ...expRows,
-    ["TOTAL", "", "", "", fmt(totalExpenses)],
-  ];
-  drawTable(page, t1X, curY, colT1, t1Rows, font, boldFont, 1, [3, 4]);
 
   const pdfBytes = await pdfDoc.save();
   return new NextResponse(Buffer.from(pdfBytes), {
