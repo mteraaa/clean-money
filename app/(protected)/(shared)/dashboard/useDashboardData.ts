@@ -15,6 +15,7 @@ export function useDashboardData() {
   const [publishedReport, setPublishedReport] = useState<PublishedReport | null>(null);
   const [balanceKey, setBalanceKey] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [fineStudentsPaid, setFineStudentsPaid] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -48,7 +49,7 @@ export function useDashboardData() {
 
       let balanceQuery = supabase
         .from("balance_cards")
-        .select("cash_on_bank, cash_on_hand, collectibles");
+        .select("cash_on_bank, cash_on_hand, collectibles, fine_amount, total_students_with_fines");
       if (userData.faculty_code) {
         balanceQuery = balanceQuery.eq("faculty_code", userData.faculty_code);
       } else {
@@ -64,6 +65,8 @@ export function useDashboardData() {
         cash_on_bank: balanceData?.cash_on_bank ?? 0,
         cash_on_hand: balanceData?.cash_on_hand ?? 0,
         collectibles: balanceData?.collectibles ?? 0,
+        fine_amount: balanceData?.fine_amount ?? 0,
+        total_students_with_fines: balanceData?.total_students_with_fines ?? 0,
         faculty_code: userData.faculty_code,
         campus_code: userData.campus_code,
       });
@@ -87,13 +90,22 @@ export function useDashboardData() {
         ? { col: "faculty_code", val: userData.faculty_code }
         : { col: "campus_code", val: userData.campus_code };
 
-      const [{ count: incomeCount }, { count: expenseCount }] = await Promise.all([
+      const [
+        { count: incomeCount },
+        { count: expenseCount },
+        { data: finesData },
+      ] = await Promise.all([
         supabase.from("entries").select("id", { count: "exact", head: true })
           .eq("semester_id", sem.id).eq("category", "income").eq(scope.col, scope.val),
         supabase.from("entries").select("id", { count: "exact", head: true })
           .eq("semester_id", sem.id).eq("category", "expense").eq(scope.col, scope.val),
+        supabase.from("entries").select("quantity")
+          .eq("semester_id", sem.id).eq("category", "income").eq("description", "Fines")
+          .eq("is_deleted", false).eq(scope.col, scope.val),
       ]);
       setNextControlNumbers({ income: (incomeCount ?? 0) + 1, expense: (expenseCount ?? 0) + 1 });
+      const paid = (finesData ?? []).reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+      setFineStudentsPaid(paid);
 
       const reportQ = supabase.from("reports").select("id, file_path").eq("semester_id", sem.id);
       if (userData.faculty_code) reportQ.eq("faculty_code", userData.faculty_code);
@@ -112,12 +124,26 @@ export function useDashboardData() {
   async function refreshBalance() {
     if (!balance) return;
     const supabase = createClient();
-    let q = supabase.from("balance_cards").select("cash_on_bank, cash_on_hand, collectibles");
+    let q = supabase.from("balance_cards").select("cash_on_bank, cash_on_hand, collectibles, fine_amount, total_students_with_fines");
     if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
     else q = q.eq("campus_code", balance.campus_code).is("faculty_code", null);
     const { data, error } = await q.single();
     if (error) console.error("Balance fetch error:", error.message);
     if (data) setBalance((prev) => (prev ? { ...prev, ...data } : prev));
+
+    // Re-fetch fineStudentsPaid from entries
+    const scope = balance.faculty_code
+      ? { col: "faculty_code" as const, val: balance.faculty_code }
+      : { col: "campus_code" as const, val: balance.campus_code! };
+    const activeSem = await supabase.from("semesters").select("id").eq("is_active", true).single();
+    if (activeSem.data) {
+      const { data: finesData } = await supabase.from("entries").select("quantity")
+        .eq("semester_id", activeSem.data.id).eq("category", "income").eq("description", "Fines")
+        .eq("is_deleted", false).eq(scope.col, scope.val);
+      const paid = (finesData ?? []).reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+      setFineStudentsPaid(paid);
+    }
+
     setBalanceKey((prev) => prev + 1);
   }
 
@@ -132,6 +158,7 @@ export function useDashboardData() {
     publishedReport, setPublishedReport,
     balanceKey,
     refreshKey, setRefreshKey,
+    fineStudentsPaid,
     refreshBalance,
   };
 }
