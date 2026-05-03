@@ -109,10 +109,16 @@ export function useAddEntry({
 
     for (let i = 0; i < forms.length; i++) {
       const f = forms[i];
+      const isReimbursement = f.category === "expense" && f.description_preset === "Reimbursement";
       const needsExtra =
         f.description_preset === "Others" ||
-        (f.category === "expense" && f.description_preset === "Special Projects/Fund Raising");
-      const finalDescription = needsExtra ? f.description_other : f.description_preset;
+        (f.category === "expense" && f.description_preset === "Special Projects/Fund Raising") ||
+        isReimbursement;
+      const finalDescription = isReimbursement
+        ? `Reimbursement — ${f.payee ? f.payee + " — " : ""}${f.description_other}`
+        : needsExtra
+          ? f.description_other
+          : f.description_preset;
 
       const incomesBefore = forms.slice(0, i).filter((f) => f.category === "income").length;
       const expensesBefore = forms.slice(0, i).filter((f) => f.category === "expense").length;
