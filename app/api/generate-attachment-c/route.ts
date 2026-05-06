@@ -5,41 +5,57 @@ import fs from "fs";
 import path from "path";
 import {
   BLACK,
+  WHITE,
   fmt,
+  ROW_H,
   type DrawPage,
   type PageSetupOpts,
   centerText,
+  wrapText,
+  computeRowHeights,
   drawTable,
   setupPage,
   ensurePage,
-  calcTableH,
   drawPreparedBy,
 } from "./pdf-helpers";
 import {
-  PRESET_ORDER,
   type ExpEntry,
   STD_COLS,
   REIMB_COLS,
   STD_HEADERS,
   REIMB_HEADERS,
   buildRows,
-  groupEntries,
+  getPreset,
 } from "./data";
 
 const LEFT = 40,
   CONTENT_TOP = 680,
   CONTENT_BOT = 80;
 
+type CustomTable = { title: string; entryIds: string[] };
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const attachCTitle = searchParams.get("attachCTitle") || "ATTACHMENT C";
   const preparedByName = searchParams.get("preparedByName") ?? "";
   const preparedByPosition = searchParams.get("preparedByPosition") ?? "";
-  let tableTitles: Record<string, string> = {};
+
+  let customTables: CustomTable[] = [];
   try {
-    tableTitles = JSON.parse(searchParams.get("tableTitles") ?? "{}");
+    const raw = searchParams.get("customTables");
+    if (raw) customTables = JSON.parse(raw);
   } catch {
     /* empty */
+  }
+
+  const allIds = customTables.flatMap((t) => t.entryIds);
+
+  if (allIds.length === 0) {
+    const templateBytes = fs.readFileSync(
+      path.join(process.cwd(), "public", "attachment-c-template.pdf"),
+    );
+    return new NextResponse(Buffer.from(templateBytes), {
+      headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline" },
+    });
   }
 
   const supabase = await createClient();
@@ -83,8 +99,9 @@ export async function GET(request: Request) {
   let expQ = supabase
     .from("entries")
     .select(
-      "entry_date, control_number, description, unit_price, quantity, total_price",
+      "id, entry_date, control_number, description, unit_price, quantity, total_price",
     )
+    .in("id", allIds)
     .eq("semester_id", sem.id)
     .eq("category", "expense")
     .order("entry_date", { ascending: true });
@@ -92,9 +109,8 @@ export async function GET(request: Request) {
   else expQ = expQ.eq("campus_code", campus_code!);
   const { data: raw } = await expQ;
 
-  const groups = groupEntries((raw ?? []) as ExpEntry[]);
-  const activePresets = PRESET_ORDER.filter(
-    (p) => (groups.get(p)?.length ?? 0) > 0,
+  const entryMap = new Map<string, ExpEntry>(
+    (raw ?? []).map((e) => [String(e.id), e as ExpEntry]),
   );
 
   const pdfDoc = await PDFDocument.load(
@@ -102,6 +118,9 @@ export async function GET(request: Request) {
       path.join(process.cwd(), "public", "attachment-c-template.pdf"),
     ),
   );
+  // Strip extra template pages so ensurePage always copies the clean page 0
+  while (pdfDoc.getPageCount() > 1) pdfDoc.removePage(1);
+
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const { width } = pdfDoc.getPages()[0].getSize();
@@ -123,21 +142,31 @@ export async function GET(request: Request) {
   let currentPage = pdfDoc.getPages()[0];
   setup(currentPage);
 
+  function coverTemplatePlaceholders(pg: DrawPage) {
+    // Cover only the narrow band between the header bottom and CONTENT_TOP where
+    // the template has placeholder text (ATTACHMENT C, TABLE 1, etc.).
+    // height: 80 reaches from CONTENT_TOP up to ~y=760, below the logo at ~y=760+.
+    pg.drawRectangle({ x: 0, y: CONTENT_TOP, width, height: 50, color: WHITE });
+  }
+
   async function ensureSpace(neededH: number) {
     if (curY - neededH < CONTENT_BOT + 10) {
       currentPage = await ensurePage(pdfDoc, ++pageIndex);
       setup(currentPage);
+      coverTemplatePlaceholders(currentPage);
       curY = CONTENT_TOP;
     }
   }
 
-  centerText(currentPage, attachCTitle, curY, width, boldFont, 11);
-  curY -= 22;
+  for (const ct of customTables) {
+    const entries = ct.entryIds
+      .map((id) => entryMap.get(id))
+      .filter(Boolean) as ExpEntry[];
+    if (entries.length === 0) continue;
 
-  for (let ti = 0; ti < activePresets.length; ti++) {
-    const preset = activePresets[ti];
-    const entries = groups.get(preset) ?? [];
-    const isReimb = preset === "Reimbursement";
+    const isReimb = entries.every(
+      (e) => getPreset(e.description ?? "") === "Reimbursement",
+    );
     const colWidths = isReimb ? REIMB_COLS : STD_COLS;
     const total = entries.reduce((s, e) => s + (Number(e.total_price) || 0), 0);
     const tableRows: string[][] = [
@@ -145,24 +174,67 @@ export async function GET(request: Request) {
       ...buildRows(entries, isReimb),
       ["TOTAL", ...Array(colWidths.length - 2).fill(""), fmt(total)],
     ];
-    const tableH = calcTableH(tableRows, colWidths, font);
-    await ensureSpace(16 + tableH);
-    currentPage.drawText(
-      tableTitles[preset] ?? `TABLE ${ti + 1}. ${preset.toUpperCase()}`,
-      { x: LEFT, y: curY, size: 8.5, font: boldFont, color: BLACK },
-    );
-    curY -= 16;
-    drawTable(
-      currentPage,
-      LEFT + (CONTENT_W - colWidths.reduce((a, b) => a + b, 0)) / 2,
-      curY,
+    const titleLines = wrapText(ct.title, CONTENT_W, boldFont, 11);
+    const titleH = titleLines.length * 14;
+    // Ensure space for title + at least header + 1 data row
+    await ensureSpace(titleH + 4 + ROW_H * 2);
+    for (const line of titleLines) {
+      centerText(currentPage, line, curY, width, boldFont, 11);
+      curY -= 14;
+    }
+    curY -= 4;
+
+    // Paginate table rows: header row + data rows + total row
+    const headerRow = tableRows[0];
+    const dataRows = tableRows.slice(1, -1);
+    const totalRow = tableRows[tableRows.length - 1];
+    const tableX = LEFT + (CONTENT_W - colWidths.reduce((a, b) => a + b, 0)) / 2;
+    const rightAlign = isReimb ? [3] : [3, 4, 5];
+    const allDataHeights = computeRowHeights(
+      [headerRow, ...dataRows],
       colWidths,
-      tableRows,
       font,
-      boldFont,
-      isReimb ? [3] : [3, 4, 5],
-    );
-    curY -= tableH + 20;
+      2,
+      false,
+    ).slice(1); // drop header height, keep only data row heights
+
+    let di = 0;
+    while (di <= dataRows.length) {
+      // Collect data rows that fit on current page (reserve space for header + total)
+      const reserved = ROW_H * 2;
+      const available = curY - CONTENT_BOT - 10;
+      if (available < reserved) {
+        currentPage = await ensurePage(pdfDoc, ++pageIndex);
+        setup(currentPage);
+        coverTemplatePlaceholders(currentPage);
+        curY = CONTENT_TOP;
+      }
+      const avail2 = curY - CONTENT_BOT - 10 - reserved;
+      let usedH = 0;
+      let count = 0;
+      while (di + count < dataRows.length && usedH + allDataHeights[di + count] <= avail2) {
+        usedH += allDataHeights[di + count];
+        count++;
+      }
+      // Force at least 1 data row to avoid infinite loop
+      if (count === 0 && di < dataRows.length) count = 1;
+
+      const isLast = di + count >= dataRows.length;
+      const segData = dataRows.slice(di, di + count);
+      const segRows = [headerRow, ...segData, ...(isLast ? [totalRow] : [])];
+      const segH = ROW_H + allDataHeights.slice(di, di + count).reduce((a, b) => a + b, 0) + (isLast ? ROW_H : 0);
+
+      drawTable(currentPage, tableX, curY, colWidths, segRows, font, boldFont, rightAlign, 2, isLast);
+      curY -= segH;
+      di += count;
+
+      if (isLast) break;
+      currentPage = await ensurePage(pdfDoc, ++pageIndex);
+      setup(currentPage);
+      coverTemplatePlaceholders(currentPage);
+      curY = CONTENT_TOP;
+    }
+    curY -= 20;
   }
 
   await ensureSpace(70);

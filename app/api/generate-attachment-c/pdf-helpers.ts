@@ -66,6 +66,20 @@ export function centerText(
   page.drawText(text, { x: (pageWidth - w) / 2, y, size, font, color: BLACK });
 }
 
+export function computeRowHeights(
+  rows: string[][],
+  colWidths: number[],
+  font: Font,
+  wrapCol = 2,
+  hasTotalRow = true,
+): number[] {
+  return rows.map((row, r) => {
+    if (r === 0 || (hasTotalRow && r === rows.length - 1)) return ROW_H;
+    const lines = wrapText(row[wrapCol] ?? "", colWidths[wrapCol] - 8, font, TABLE_SZ);
+    return Math.max(ROW_H, lines.length * LINE_H + 4);
+  });
+}
+
 export function drawTable(
   page: DrawPage,
   x: number,
@@ -76,20 +90,12 @@ export function drawTable(
   boldFont: Font,
   rightAlignCols: number[] = [],
   wrapCol = 2,
+  hasTotalRow = true,
 ) {
   const sz = TABLE_SZ;
   const totalW = colWidths.reduce((a, b) => a + b, 0);
 
-  const rowHeights = rows.map((row, r) => {
-    if (r === 0 || r === rows.length - 1) return ROW_H;
-    const lines = wrapText(
-      row[wrapCol] ?? "",
-      colWidths[wrapCol] - 8,
-      font,
-      sz,
-    );
-    return Math.max(ROW_H, lines.length * LINE_H + 4);
-  });
+  const rowHeights = computeRowHeights(rows, colWidths, font, wrapCol, hasTotalRow);
   const totalH = rowHeights.reduce((a, b) => a + b, 0);
 
   page.drawRectangle({
@@ -113,7 +119,7 @@ export function drawTable(
         thickness: 0.5,
       });
 
-    const isTotalRow = r === rows.length - 1;
+    const isTotalRow = hasTotalRow && r === rows.length - 1;
     const f = r === 0 || isTotalRow ? boldFont : font;
     const midY = rowTop - rh / 2 - sz * 0.3;
 
@@ -229,12 +235,9 @@ export function calcTableH(
   tableRows: string[][],
   colWidths: number[],
   font: Font,
+  hasTotalRow = true,
 ): number {
-  return tableRows.reduce((sum, row, r) => {
-    if (r === 0 || r === tableRows.length - 1) return sum + ROW_H;
-    const lines = wrapText(row[2] ?? "", colWidths[2] - 8, font, TABLE_SZ);
-    return sum + Math.max(ROW_H, lines.length * LINE_H + 4);
-  }, 0);
+  return computeRowHeights(tableRows, colWidths, font, 2, hasTotalRow).reduce((a, b) => a + b, 0);
 }
 
 export function drawPreparedBy(
