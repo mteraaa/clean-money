@@ -9,6 +9,7 @@ export const STD_HEADERS = ["Date", "OR/TR No.", "Description", "Unit Price", "Q
 export const REIMB_HEADERS = ["Date", "Payee", "Description", "Amount"];
 
 export type ExpEntry = {
+  id: string;
   entry_date: string | null;
   control_number: number | null;
   description: string | null;
@@ -17,7 +18,7 @@ export type ExpEntry = {
   total_price: number | null;
 };
 
-function getPreset(desc: string): Preset {
+export function getPreset(desc: string): Preset {
   if (desc.startsWith("Reimbursement")) return "Reimbursement";
   if (desc.startsWith("Special Projects/Fund Raising")) return "Special Projects/Fund Raising";
   return "Others";
