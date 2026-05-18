@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
 import { toast } from "sonner";
+import { formatPeso } from "./formatPeso";
 
 export type BankAction = "deposit" | "withdrawal" | "interest" | "collectibles_add";
 
@@ -11,12 +12,18 @@ export function useBalanceActions({
   cashOnBank,
   cashOnHand,
   collectibles = 0,
+  fineAmount = 0,
+  totalStudentsWithFines = 0,
+  fineStudentsPaid = 0,
   facultyCode,
   campusCode,
 }: {
   cashOnBank: number;
   cashOnHand: number;
   collectibles?: number;
+  fineAmount?: number;
+  totalStudentsWithFines?: number;
+  fineStudentsPaid?: number;
   facultyCode?: string | null;
   campusCode?: string | null;
 }) {
@@ -36,6 +43,23 @@ export function useBalanceActions({
   const [calcOpen, setCalcOpen] = useState(false);
   const [calcInput, setCalcInput] = useState("");
   const [calcSaving, setCalcSaving] = useState(false);
+
+  // Fines state
+  const [fineAmt, setFineAmt] = useState(fineAmount);
+  const [totalFineStudents, setTotalFineStudents] = useState(totalStudentsWithFines);
+  const [fineEditOpen, setFineEditOpen] = useState(false);
+  const [fineAmtInput, setFineAmtInput] = useState("");
+  const [fineTotalInput, setFineTotalInput] = useState("");
+  const [fineSaving, setFineSaving] = useState(false);
+  const [finesAdded, setFinesAdded] = useState(false);
+  const prevFineStudentsPaid = useRef(fineStudentsPaid);
+
+  useEffect(() => {
+    if (prevFineStudentsPaid.current !== fineStudentsPaid) {
+      prevFineStudentsPaid.current = fineStudentsPaid;
+      setFinesAdded(false);
+    }
+  }, [fineStudentsPaid]);
 
   function openCalc(action: BankAction) {
     setBankAction(action);
@@ -61,6 +85,7 @@ export function useBalanceActions({
     setColl(value);
     setPrevColl(null);
     collToastId.current = null;
+    setFinesAdded(false);
   }
 
   async function executeUndoBank(value: { bank: number; hand: number }) {
@@ -168,18 +193,57 @@ export function useBalanceActions({
     closeCalc();
   }, [calcInput, bank, hand, coll, bankAction, facultyCode, campusCode]);
 
-  useEffect(() => {
-    if (!calcOpen) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); handleCalcKey(e.key); }
-      else if (e.key === ".") { e.preventDefault(); handleCalcKey("."); }
-      else if (e.key === "Backspace") { e.preventDefault(); handleCalcKey("⌫"); }
-      else if (e.key === "Enter") { e.preventDefault(); confirmCalc(); }
-      else if (e.key === "Escape") { e.preventDefault(); closeCalc(); }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [calcOpen, handleCalcKey, confirmCalc]);
+  // Fines: open/close edit dialog
+  function openFineEdit() {
+    setFineAmtInput(fineAmt > 0 ? String(fineAmt) : "");
+    setFineTotalInput(totalFineStudents > 0 ? String(totalFineStudents) : "");
+    setFineEditOpen(true);
+  }
+
+  function closeFineEdit() {
+    setFineEditOpen(false);
+  }
+
+  async function saveFineEdit() {
+    const amt = parseFloat(fineAmtInput) || 0;
+    const total = parseInt(fineTotalInput) || 0;
+    setFineSaving(true);
+    const supabase = createClient();
+    let q = supabase.from("balance_cards").update({ fine_amount: amt, total_students_with_fines: total });
+    if (facultyCode) q = q.eq("faculty_code", facultyCode);
+    else q = q.eq("campus_code", campusCode!).is("faculty_code", null);
+    await q;
+    setFineAmt(amt);
+    setTotalFineStudents(total);
+    setFineSaving(false);
+    setFineEditOpen(false);
+    setFinesAdded(false);
+    toast.success("Fine details updated");
+  }
+
+  // Fines: add remaining unpaid × fine amount to collectibles
+  async function handleAddFineToCollectibles() {
+    const remaining = Math.max(0, totalFineStudents - fineStudentsPaid);
+    const addAmt = remaining * fineAmt;
+    if (addAmt <= 0) return;
+
+    setPrevColl(coll);
+    const newColl = coll + addAmt;
+    const supabase = createClient();
+    let q = supabase.from("balance_cards").update({ collectibles: newColl });
+    if (facultyCode) q = q.eq("faculty_code", facultyCode);
+    else q = q.eq("campus_code", campusCode!).is("faculty_code", null);
+    await q;
+    setColl(newColl);
+
+    const desc = `Added ${formatPeso(addAmt)} to Collectibles from Fines (${remaining} unpaid × ${formatPeso(fineAmt)})`;
+    const saved = coll;
+    logActivity({ description: desc, action: "COLLECTIBLES_ADD", facultyCode, campusCode, targetTable: "balance_cards" })
+      .then((id) => { collLogId.current = id ?? null; }).catch(() => {});
+    const id = toast.success(desc, { action: { label: "Undo", onClick: () => executeUndoColl(saved) } });
+    collToastId.current = id;
+    setFinesAdded(true);
+  }
 
   return {
     visible, setVisible,
@@ -190,5 +254,13 @@ export function useBalanceActions({
     openCalc, closeCalc,
     handleUndoColl, handleUndoBank,
     handleCalcKey, confirmCalc,
+    // fines
+    fineAmt, totalFineStudents,
+    fineEditOpen, fineAmtInput, fineTotalInput, fineSaving,
+    finesAdded,
+    openFineEdit, closeFineEdit,
+    setFineAmtInput, setFineTotalInput,
+    saveFineEdit,
+    handleAddFineToCollectibles,
   };
 }

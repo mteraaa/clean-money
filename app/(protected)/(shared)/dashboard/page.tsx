@@ -23,6 +23,7 @@ export default function DashboardPage() {
     addSubmitting,
     refreshKey,
     balanceKey,
+    fineStudentsPaid,
     previewOpen, setPreviewOpen,
     publishOpen, setPublishOpen,
     unpublishOpen, setUnpublishOpen,
@@ -64,6 +65,9 @@ export default function DashboardPage() {
           cashOnBank={balance.cash_on_bank}
           cashOnHand={balance.cash_on_hand}
           collectibles={balance.collectibles}
+          fineAmount={balance.fine_amount}
+          totalStudentsWithFines={balance.total_students_with_fines}
+          fineStudentsPaid={fineStudentsPaid}
           facultyCode={balance.faculty_code}
           campusCode={balance.campus_code}
           isPublished={isLocked}
