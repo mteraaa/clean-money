@@ -27,7 +27,7 @@ export default function Home() {
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
   const viewerRef = useRef<HTMLElement>(null);
-  const [reportUrl, setReportUrl] = useState("/report-template.pdf");
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
   const [reportTitle, setReportTitle] = useState("Financial Report Preview");
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!selectedCampus || !selectedSemester) {
-      setReportUrl("/report-template.pdf");
+      setReportUrl(null);
       setReportTitle("Financial Report Preview");
       return;
     }
@@ -87,22 +87,23 @@ export default function Home() {
       const supabase = createClient();
       const query = supabase
         .from("reports")
-        .select("id, file_path, title")
+        .select("id, summary_file_path, title")
         .eq("semester_id", parseInt(selectedSemester));
       const isFaculty = selectedFaculty && selectedFaculty !== "__none__";
       if (isFaculty) query.eq("faculty_code", selectedFaculty);
       else query.eq("campus_code", selectedCampus).is("faculty_code", null);
       const { data } = await query.maybeSingle();
-      if (!data?.file_path) {
-        setReportUrl("/report-template.pdf");
-        setReportTitle("No report available");
+      if (!data?.summary_file_path) {
+        setReportUrl(null);
+        setReportTitle("No report found");
         return;
       }
-      const bucket = isFaculty ? "Faculties" : "Campus SEB";
-      const { data: signed } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(data.file_path, 3600);
-      setReportUrl(signed?.signedUrl ?? "/report-template.pdf");
+      const params = new URLSearchParams({
+        campus_code: selectedCampus,
+        semester_id: selectedSemester,
+      });
+      if (isFaculty) params.set("faculty_code", selectedFaculty);
+      setReportUrl(`/api/public-pdf?${params.toString()}`);
       setReportTitle(data.title ?? "Financial Report");
     })();
   }, [selectedCampus, selectedFaculty, selectedSemester]);
@@ -230,7 +231,7 @@ export default function Home() {
 
         {/* Glass PDF viewer card */}
         <div
-          className="w-full rounded-xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.4)] transition-all duration-700 ease-in-out hover:-translate-y-2 group"
+          className="w-full rounded-xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
           style={{
             background: "rgba(32,37,49,0.6)",
             backdropFilter: "blur(20px)",
@@ -272,41 +273,41 @@ export default function Home() {
                 className="w-px h-4 mx-2"
                 style={{ background: "rgba(69,70,76,0.5)" }}
               />
-              <a
-                href={reportUrl}
-                download
-                className="hover:text-[#c2c6d6] transition-colors"
-              >
-                <Download className="w-5 h-5" />
-              </a>
+              {reportUrl && (
+                <a
+                  href={reportUrl}
+                  download
+                  className="hover:text-[#c2c6d6] transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                </a>
+              )}
             </div>
           </div>
 
           {/* PDF content area */}
           <div
-            className="relative"
-            style={{ height: "819px", background: "#e0e3e5" }}
+            className="relative flex items-center justify-center"
+            style={{ height: "819px", background: reportUrl ? "#e0e3e5" : "#181c1e" }}
           >
-            <iframe
-              key={reportUrl}
-              src={reportUrl}
-              className="w-full h-full border-0"
-              title="Financial Report"
-            />
-            {/* Scroll hint — appears on card hover */}
-            <div
-              className="absolute bottom-0 left-0 w-full h-32 pointer-events-none flex items-end justify-center pb-8 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-              style={{
-                background: "linear-gradient(to top, #e0e3e5, transparent)",
-              }}
-            >
-              <span
-                className="bg-[#272a2c] text-[#e0e3e5] px-4 py-2 rounded-full text-xs font-semibold shadow-lg flex items-center gap-2 pointer-events-auto"
-                style={{ fontFamily: "var(--font-lexend)" }}
-              >
-                Scroll to read more <ArrowDown className="w-3 h-3" />
-              </span>
-            </div>
+            {reportUrl ? (
+              <iframe
+                key={reportUrl}
+                src={reportUrl}
+                className="w-full h-full border-0"
+                title="Financial Report"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-center">
+                <FileText className="w-10 h-10 text-[#4a5057]" />
+                <p
+                  className="text-[#6b7280] text-sm"
+                  style={{ fontFamily: "var(--font-lexend)" }}
+                >
+                  No report found
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
