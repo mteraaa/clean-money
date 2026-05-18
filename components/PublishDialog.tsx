@@ -124,6 +124,8 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       if (!userData) throw new Error("User data not found");
       if (!sem) throw new Error("No active semester");
       const semId = sem.id;
+      const facultyCode = userData.faculty_code;
+      const campusCode = userData.campus_code;
 
       const ayRaw = sem.academic_years;
       const yearLabel = ((Array.isArray(ayRaw) ? ayRaw[0] : ayRaw) as { year_label?: string } | null)?.year_label ?? "";
@@ -133,23 +135,23 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       let basePath = "";
       let publicBasePath = "";
       let pdfsBasePath = "";
-      const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
+      const bucket = facultyCode ? "Faculties" : "Campus SEB";
 
-      if (userData.faculty_code) {
-        const { data: facData } = await supabase.from("faculty_seb").select("campus_code").eq("faculty_code", userData.faculty_code).single();
+      if (facultyCode) {
+        const { data: facData } = await supabase.from("faculty_seb").select("campus_code").eq("faculty_code", facultyCode).single();
         const { data: campusData } = await supabase.from("campus_seb").select("name").eq("campus_code", facData?.campus_code).single();
         const campusName = campusData?.name ?? "";
-        title = `${userData.faculty_code}-SEB Financial Report (${yearLabel}_${semesterName})`;
-        basePath = `${campusName}/${userData.faculty_code}/Financial Reports`;
-        publicBasePath = `${campusName}/${userData.faculty_code}/Public`;
-        pdfsBasePath = `${campusName}/${userData.faculty_code}/PDFs`;
+        title = `${facultyCode}-SEB Financial Report (${yearLabel}_${semesterName})`;
+        basePath = `${campusName}/${facultyCode}/Financial Reports`;
+        publicBasePath = `${campusName}/${facultyCode}/Public`;
+        pdfsBasePath = `${campusName}/${facultyCode}/PDFs`;
       } else {
-        const { data: campusData } = await supabase.from("campus_seb").select("name").eq("campus_code", userData.campus_code).single();
-        const campusName = campusData?.name ?? userData.campus_code ?? "";
+        const { data: campusData } = await supabase.from("campus_seb").select("name").eq("campus_code", campusCode).single();
+        const campusName = campusData?.name ?? campusCode ?? "";
         title = `SEB-${campusName} Financial Report (${yearLabel}_${semesterName})`;
-        basePath = `${userData.campus_code}/Financial Reports`;
-        publicBasePath = `${userData.campus_code}/Public`;
-        pdfsBasePath = `${userData.campus_code}/PDFs`;
+        basePath = `${campusCode}/Financial Reports`;
+        publicBasePath = `${campusCode}/Public`;
+        pdfsBasePath = `${campusCode}/PDFs`;
       }
 
       // Upload certification report to Financial Reports folder
@@ -179,8 +181,8 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
           published_by: userId,
           semester_id: semId,
         };
-        if (userData.faculty_code) record.faculty_code = userData.faculty_code;
-        else record.campus_code = userData.campus_code;
+        if (facultyCode) record.faculty_code = facultyCode;
+        else record.campus_code = campusCode;
         await supabase.from("archives").insert(record);
         return filePath;
       }
@@ -190,8 +192,8 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       await saveToArchives(attachCPdfSrc, "Attachment C", pdfsBasePath);
 
       const existingQ = supabase.from("reports").select("id").eq("semester_id", semId);
-      if (userData.faculty_code) existingQ.eq("faculty_code", userData.faculty_code);
-      else existingQ.eq("campus_code", userData.campus_code);
+      if (facultyCode) existingQ.eq("faculty_code", facultyCode);
+      else existingQ.eq("campus_code", campusCode);
       const { data: existing } = await existingQ.maybeSingle();
 
       if (existing) {
@@ -216,8 +218,8 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         published_at: new Date().toISOString(), published_by: userId, semester_id: semId,
       };
       if (summaryFilePath) record.summary_file_path = summaryFilePath;
-      if (userData.faculty_code) record.faculty_code = userData.faculty_code;
-      else record.campus_code = userData.campus_code;
+      if (facultyCode) record.faculty_code = facultyCode;
+      else record.campus_code = campusCode;
 
       const { data: insertData, error: insertError } = await supabase.from("reports").insert(record).select("id").single();
       if (insertError) throw new Error(insertError.message);
@@ -225,7 +227,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       logActivity({
         description: `Published financial report: ${title}`,
         action: "PUBLISH_REPORT", module: "REPORTS",
-        facultyCode: userData.faculty_code, campusCode: userData.campus_code,
+        facultyCode: facultyCode, campusCode: campusCode,
         targetTable: "reports", targetId: insertData?.id,
       }).catch(() => {});
 
