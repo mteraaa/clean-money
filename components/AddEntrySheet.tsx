@@ -19,26 +19,30 @@ export const INCOME_DESCRIPTIONS = [
   "Special Projects/Fund Raising",
   "Others",
 ];
-export const EXPENSE_DESCRIPTIONS = ["Special Projects/Fund Raising", "Others"];
+export const EXPENSE_DESCRIPTIONS = ["Special Projects/Fund Raising", "Reimbursement", "Others"];
 
 export type FormState = {
   date: string;
   description_preset: string;
   description_other: string;
+  payee: string;
   category: "income" | "expense";
   unit_price: string;
   quantity: string;
   receipt?: File | null;
+  receipt_number?: string;
 };
 
 export const emptyForm: FormState = {
   date: "",
   description_preset: "",
   description_other: "",
+  payee: "",
   category: "expense",
   unit_price: "",
   quantity: "",
   receipt: null,
+  receipt_number: "",
 };
 
 function formatPeso(amount: number) {
@@ -69,9 +73,11 @@ function EntryFormFields({
   onRemove?: () => void;
 }) {
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const isReimbursement = form.category === "expense" && form.description_preset === "Reimbursement";
   const needsExtra =
     form.description_preset === "Others" ||
-    (form.category === "expense" && form.description_preset === "Special Projects/Fund Raising");
+    (form.category === "expense" && form.description_preset === "Special Projects/Fund Raising") ||
+    isReimbursement;
   const total = (parseFloat(form.unit_price) || 0) * (parseInt(form.quantity) || 0);
 
   return (
@@ -89,7 +95,7 @@ function EntryFormFields({
         <label className="text-sm text-gray-500">Category</label>
         <select
           value={form.category}
-          onChange={(e) => onChange({ ...form, category: e.target.value as "income" | "expense", description_preset: "", description_other: "" })}
+          onChange={(e) => onChange({ ...form, category: e.target.value as "income" | "expense", description_preset: "", description_other: "", payee: "" })}
           className={`border rounded-lg px-4 pr-10 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-gray-300 font-medium ${errors.category && !form.category ? "border-red-500" : form.category === "income" ? "border-green-500" : form.category === "expense" ? "border-red-500" : "border-gray-200"} ${form.category === "income" ? "text-green-600" : form.category === "expense" ? "text-red-500" : "text-gray-400"}`}
         >
           <option value="" disabled>Select category</option>
@@ -104,7 +110,7 @@ function EntryFormFields({
           value={form.description_preset}
           disabled={!form.category}
           onChange={(e) => {
-            onChange({ ...form, description_preset: e.target.value, description_other: "" });
+            onChange({ ...form, description_preset: e.target.value, description_other: "", payee: "" });
             onClearError("description");
           }}
           className={`border rounded-lg px-4 pr-10 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${errors.description && !form.description_preset ? "border-red-500" : "border-gray-200"}`}
@@ -124,6 +130,15 @@ function EntryFormFields({
             }}
             placeholder={form.description_preset === "Others" ? "Specify description" : "Specify project name"}
             className={`border rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 mt-1 ${errors.description && !form.description_other ? "border-red-500" : "border-gray-200"}`}
+          />
+        )}
+        {isReimbursement && (
+          <input
+            type="text"
+            value={form.payee}
+            onChange={(e) => onChange({ ...form, payee: e.target.value })}
+            placeholder="Payee"
+            className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 mt-1"
           />
         )}
       </div>
@@ -201,13 +216,22 @@ function EntryFormFields({
             </span>
           </label>
           {form.receipt && (
-            <button
-              type="button"
-              onClick={() => onChange({ ...form, receipt: null })}
-              className="text-xs text-red-400 hover:text-red-600 text-left"
-            >
-              Remove receipt
-            </button>
+            <>
+              <input
+                type="text"
+                value={form.receipt_number ?? ""}
+                onChange={(e) => onChange({ ...form, receipt_number: e.target.value })}
+                placeholder="Receipt number"
+                className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300"
+              />
+              <button
+                type="button"
+                onClick={() => onChange({ ...form, receipt: null, receipt_number: "" })}
+                className="text-xs text-red-400 hover:text-red-600 text-left"
+              >
+                Remove receipt
+              </button>
+            </>
           )}
         </div>
       )}

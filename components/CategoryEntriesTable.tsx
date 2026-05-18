@@ -39,6 +39,7 @@ function entryToForm(entry: Entry): FormState {
   const { category, description, unit_price, quantity, entry_date } = entry;
   let description_preset = "";
   let description_other = "";
+  let payee = "";
 
   if (category === "income") {
     if (INCOME_DESCRIPTIONS.includes(description) && description !== "Others") {
@@ -50,10 +51,17 @@ function entryToForm(entry: Entry): FormState {
   } else {
     if (description.startsWith("Special Projects/Fund Raising")) {
       description_preset = "Special Projects/Fund Raising";
-      description_other = description.replace(
-        "Special Projects/Fund Raising — ",
-        "",
-      );
+      description_other = description.replace("Special Projects/Fund Raising — ", "");
+    } else if (description.startsWith("Reimbursement")) {
+      description_preset = "Reimbursement";
+      const inner = description.replace("Reimbursement — ", "");
+      const parts = inner.split(" — ");
+      if (parts.length >= 2) {
+        payee = parts[0];
+        description_other = parts.slice(1).join(" — ");
+      } else {
+        description_other = inner;
+      }
     } else {
       description_preset = "Others";
       description_other = description;
@@ -64,6 +72,7 @@ function entryToForm(entry: Entry): FormState {
     date: entry_date,
     description_preset,
     description_other,
+    payee,
     category,
     unit_price: String(unit_price),
     quantity: String(quantity),
@@ -123,6 +132,7 @@ export default function CategoryEntriesTable({
       )
       .eq("semester_id", semId)
       .eq("category", category)
+      .eq("is_deleted", false)
       .order("entry_date", { ascending: false });
 
     if (facultyCode) query = query.eq("faculty_code", facultyCode);
@@ -178,15 +188,36 @@ export default function CategoryEntriesTable({
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     const deleted = entries.filter((e) => selectedIds.has(e.id));
-    const { error } = await supabase.from("entries").delete().in("id", Array.from(selectedIds));
+    const ids = Array.from(selectedIds);
+
+    const { error } = await supabase
+      .from("entries")
+      .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+      .in("id", ids);
     if (error) { console.error("Bulk delete error:", error.message); return; }
 
     setEntries((prev) => prev.filter((e) => !selectedIds.has(e.id)));
     setSelectedIds(new Set());
     setSelectMode(false);
     onMutation?.();
-    toast.error(`Deleted ${deleted.length} ${category === "income" ? "income" : "expense"} ${deleted.length === 1 ? "entry" : "entries"}`);
+
+    const label = `${category === "income" ? "income" : "expense"} ${deleted.length === 1 ? "entry" : "entries"}`;
+    toast.error(`Deleted ${deleted.length} ${label}`, {
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          await supabase
+            .from("entries")
+            .update({ is_deleted: false, deleted_at: null, deleted_by: null })
+            .in("id", ids);
+          if (semesterId) await fetchEntries(createClient(), semesterId);
+          onMutation?.();
+        },
+      },
+    });
+
     deleted.forEach((e) => logActivity({
       description: `Deleted "${e.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
       action: "DELETE_ENTRY",
@@ -199,21 +230,41 @@ export default function CategoryEntriesTable({
 
   async function handleDelete(id: number) {
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
     const entry = entries.find((e) => e.id === id);
-    const { error } = await supabase.from("entries").delete().eq("id", id);
+
+    const { error } = await supabase
+      .from("entries")
+      .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+      .eq("id", id);
     if (error) { console.error("Delete error:", error.message); return; }
 
     setEntries((prev) => prev.filter((e) => e.id !== id));
     onMutation?.();
-    if (entry) toast.error(`Deleted "${entry.description}"`);
-    if (entry) logActivity({
-      description: `Deleted "${entry.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
-      action: "DELETE_ENTRY",
-      facultyCode,
-      campusCode,
-      targetTable: "entries",
-      targetId: id,
-    }).catch(() => {});
+
+    if (entry) {
+      toast.error(`Deleted "${entry.description}"`, {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            await supabase
+              .from("entries")
+              .update({ is_deleted: false, deleted_at: null, deleted_by: null })
+              .eq("id", id);
+            if (semesterId) await fetchEntries(createClient(), semesterId);
+            onMutation?.();
+          },
+        },
+      });
+      logActivity({
+        description: `Deleted "${entry.description}" from ${category === "income" ? "Income" : "Expense"} entries`,
+        action: "DELETE_ENTRY",
+        facultyCode,
+        campusCode,
+        targetTable: "entries",
+        targetId: id,
+      }).catch(() => {});
+    }
   }
 
   function openEditSheet(entry: Entry) {
@@ -227,7 +278,9 @@ export default function CategoryEntriesTable({
     const editNeedsExtra =
       editForm.description_preset === "Others" ||
       (editForm.category === "expense" &&
-        editForm.description_preset === "Special Projects/Fund Raising");
+        editForm.description_preset === "Special Projects/Fund Raising") ||
+      (editForm.category === "expense" &&
+        editForm.description_preset === "Reimbursement");
     const finalDescription = editNeedsExtra
       ? editForm.description_other
       : editForm.description_preset;
