@@ -34,6 +34,7 @@ export default function BalanceCards({ isPublished = false, ...rest }: Props) {
     handleCalcKey, confirmCalc,
     fineAmt, totalFineStudents,
     fineEditOpen, fineAmtInput, fineTotalInput, fineSaving,
+    finesAdded,
     openFineEdit, closeFineEdit,
     setFineAmtInput, setFineTotalInput,
     saveFineEdit,
@@ -93,6 +94,7 @@ export default function BalanceCards({ isPublished = false, ...rest }: Props) {
               studentsPaid={rest.fineStudentsPaid ?? 0}
               visible={visible}
               isPublished={isPublished}
+              finesAdded={finesAdded}
               onEdit={openFineEdit}
               onAddToCollectibles={handleAddFineToCollectibles}
             />
