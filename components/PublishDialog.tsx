@@ -115,9 +115,10 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+      const userId = user.id;
 
       const [{ data: userData }, { data: sem }] = await Promise.all([
-        supabase.from("users").select("faculty_code, campus_code").eq("auth_id", user.id).single(),
+        supabase.from("users").select("faculty_code, campus_code").eq("auth_id", userId).single(),
         supabase.from("semesters").select("id, semester_name, academic_years(year_label)").eq("is_active", true).single(),
       ]);
       if (!userData) throw new Error("User data not found");
@@ -174,7 +175,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
           mime_type: "application/pdf",
           file_path: filePath,
           published_at: new Date().toISOString(),
-          published_by: user.id,
+          published_by: userId,
           semester_id: sem.id,
         };
         if (userData.faculty_code) record.faculty_code = userData.faculty_code;
@@ -196,7 +197,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         const updFileName = mainPath.split("/").pop() ?? `${title}.pdf`;
         const updatePayload: Record<string, unknown> = {
           title, original_name: updFileName, stored_name: updFileName,
-          file_path: mainPath, published_at: new Date().toISOString(), published_by: user.id,
+          file_path: mainPath, published_at: new Date().toISOString(), published_by: userId,
         };
         if (summaryFilePath) updatePayload.summary_file_path = summaryFilePath;
         const { error: updateError } = await supabase.from("reports").update(updatePayload).eq("id", existing.id);
@@ -211,7 +212,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       const record: Record<string, unknown> = {
         title, original_name: fileName, stored_name: fileName,
         mime_type: "application/pdf", file_path: mainPath,
-        published_at: new Date().toISOString(), published_by: user.id, semester_id: sem.id,
+        published_at: new Date().toISOString(), published_by: userId, semester_id: sem.id,
       };
       if (summaryFilePath) record.summary_file_path = summaryFilePath;
       if (userData.faculty_code) record.faculty_code = userData.faculty_code;
