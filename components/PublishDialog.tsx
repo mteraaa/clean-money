@@ -69,7 +69,7 @@ function buildCertUrl(form: CertForm): string {
   return `/api/generate-report?${p.toString()}`;
 }
 
-type Tab = "cert" | "attachAB" | "attachC";
+type Tab = "cert" | "attachAB" | "attachC" | "public";
 
 export default function PublishDialog({ open, onClose, onPublishSuccess }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("cert");
@@ -77,6 +77,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
   const [certPdfSrc, setCertPdfSrc] = useState<string | null>(null);
   const [attachABPdfSrc, setAttachABPdfSrc] = useState<string | null>(null);
   const [attachCPdfSrc, setAttachCPdfSrc] = useState<string | null>(null);
+  const [publicPdfSrc, setPublicPdfSrc] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
@@ -87,6 +88,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
     setCertPdfSrc(`/api/generate-report?t=${Date.now()}`);
     setAttachABPdfSrc(null);
     setAttachCPdfSrc(null);
+    setPublicPdfSrc(`/api/generate-financial-summary?t=${Date.now()}`);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -127,6 +129,8 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
 
       let title = "";
       let basePath = "";
+      let publicBasePath = "";
+      let pdfsBasePath = "";
       const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
 
       if (userData.faculty_code) {
@@ -135,16 +139,53 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         const campusName = campusData?.name ?? "";
         title = `${userData.faculty_code}-SEB Financial Report (${yearLabel}_${semesterName})`;
         basePath = `${campusName}/${userData.faculty_code}/Financial Reports`;
+        publicBasePath = `${campusName}/${userData.faculty_code}/Public`;
+        pdfsBasePath = `${campusName}/${userData.faculty_code}/PDFs`;
       } else {
         const { data: campusData } = await supabase.from("campus_seb").select("name").eq("campus_code", userData.campus_code).single();
         const campusName = campusData?.name ?? userData.campus_code ?? "";
         title = `SEB-${campusName} Financial Report (${yearLabel}_${semesterName})`;
         basePath = `${userData.campus_code}/Financial Reports`;
+        publicBasePath = `${userData.campus_code}/Public`;
+        pdfsBasePath = `${userData.campus_code}/PDFs`;
       }
 
+      // Upload certification report to Financial Reports folder
       const mainPath = `${basePath}/${title}.pdf`;
       const { error: uploadError } = await supabase.storage.from(bucket).upload(mainPath, certBlob, { contentType: "application/pdf", upsert: true });
       if (uploadError) throw new Error(uploadError.message);
+
+      // Helper: upload a PDF blob to a bucket folder and insert into archives
+      async function saveToArchives(srcUrl: string | null, label: string, folderPath: string): Promise<string | null> {
+        if (!srcUrl) return null;
+        const res = await fetch(srcUrl);
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        const archiveTitle = title.replace("Financial Report", label);
+        const filePath = `${folderPath}/${archiveTitle}.pdf`;
+        const { error } = await supabase.storage
+          .from(bucket)
+          .upload(filePath, blob, { contentType: "application/pdf", upsert: true });
+        if (error) return null;
+        const record: Record<string, unknown> = {
+          title: archiveTitle,
+          original_name: `${archiveTitle}.pdf`,
+          stored_name: `${archiveTitle}.pdf`,
+          mime_type: "application/pdf",
+          file_path: filePath,
+          published_at: new Date().toISOString(),
+          published_by: user.id,
+          semester_id: sem.id,
+        };
+        if (userData.faculty_code) record.faculty_code = userData.faculty_code;
+        else record.campus_code = userData.campus_code;
+        await supabase.from("archives").insert(record);
+        return filePath;
+      }
+
+      const summaryFilePath = await saveToArchives("/api/generate-financial-summary", "Financial Summary", publicBasePath);
+      await saveToArchives(attachABPdfSrc, "Attachment A&B", pdfsBasePath);
+      await saveToArchives(attachCPdfSrc, "Attachment C", pdfsBasePath);
 
       const existingQ = supabase.from("reports").select("id").eq("semester_id", sem.id);
       if (userData.faculty_code) existingQ.eq("faculty_code", userData.faculty_code);
@@ -153,10 +194,12 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
 
       if (existing) {
         const updFileName = mainPath.split("/").pop() ?? `${title}.pdf`;
-        const { error: updateError } = await supabase.from("reports").update({
+        const updatePayload: Record<string, unknown> = {
           title, original_name: updFileName, stored_name: updFileName,
           file_path: mainPath, published_at: new Date().toISOString(), published_by: user.id,
-        }).eq("id", existing.id);
+        };
+        if (summaryFilePath) updatePayload.summary_file_path = summaryFilePath;
+        const { error: updateError } = await supabase.from("reports").update(updatePayload).eq("id", existing.id);
         if (updateError) throw new Error(updateError.message);
         onPublishSuccess?.({ id: existing.id, file_path: mainPath, bucket });
         toast.success("Financial report published successfully");
@@ -170,6 +213,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         mime_type: "application/pdf", file_path: mainPath,
         published_at: new Date().toISOString(), published_by: user.id, semester_id: sem.id,
       };
+      if (summaryFilePath) record.summary_file_path = summaryFilePath;
       if (userData.faculty_code) record.faculty_code = userData.faculty_code;
       else record.campus_code = userData.campus_code;
 
@@ -199,7 +243,9 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       ? certPdfSrc
       : activeTab === "attachAB"
         ? attachABPdfSrc
-        : attachCPdfSrc;
+        : activeTab === "attachC"
+          ? attachCPdfSrc
+          : publicPdfSrc;
 
   return (
     <div
@@ -218,7 +264,9 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
                 ? "Financial Report Preview"
                 : activeTab === "attachAB"
                   ? "Attachment A & B Preview"
-                  : "Attachment C Preview"}
+                  : activeTab === "attachC"
+                    ? "Attachment C Preview"
+                    : "Public Financial Summary Preview"}
             </span>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
               <X className="w-4 h-4" />
@@ -235,14 +283,15 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
                   : "Loading…"}
             </div>
           )}
+
         </div>
 
         {/* Form sheet */}
         <div className="w-80 border-l border-gray-200 flex flex-col shrink-0">
           <div className="px-5 py-4 border-b border-gray-200 shrink-0">
             <h2 className="text-sm font-semibold text-gray-900">Publish Report</h2>
-            <div className="flex gap-1 mt-3">
-              {(["cert", "attachAB", "attachC"] as Tab[]).map((tab) => (
+            <div className="flex gap-1 mt-3 flex-wrap">
+              {(["cert", "attachAB", "attachC", "public"] as Tab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -255,8 +304,10 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
                   {tab === "cert"
                     ? "Certification"
                     : tab === "attachAB"
-                      ? "Attachment A & B"
-                      : "Attachment C"}
+                      ? "Attach. A & B"
+                      : tab === "attachC"
+                        ? "Attach. C"
+                        : "Public"}
                 </button>
               ))}
             </div>
@@ -306,6 +357,17 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
 
             <div className={activeTab !== "attachC" ? "hidden" : ""}>
               <AttachmentCTab onPdfSrcChange={setAttachCPdfSrc} />
+            </div>
+
+            <div className={activeTab !== "public" ? "hidden" : ""}>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                Public Financial Summary
+              </p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                This PDF is auto-generated from your current financial data and
+                saved to the <span className="font-semibold text-gray-700">Public</span> folder
+                in the bucket when you publish. No inputs required.
+              </p>
             </div>
           </div>
 
