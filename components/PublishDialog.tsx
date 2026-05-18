@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
 import { toast } from "sonner";
 import AttachmentCTab from "@/components/AttachmentCTab";
+import AttachmentABTab from "@/components/AttachmentABTab";
 
 type PublishedReport = { id: number; file_path: string; bucket: string };
 
@@ -68,12 +69,13 @@ function buildCertUrl(form: CertForm): string {
   return `/api/generate-report?${p.toString()}`;
 }
 
-type Tab = "cert" | "attachC";
+type Tab = "cert" | "attachAB" | "attachC";
 
 export default function PublishDialog({ open, onClose, onPublishSuccess }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("cert");
   const [certForm, setCertForm] = useState<CertForm>(EMPTY_CERT);
   const [certPdfSrc, setCertPdfSrc] = useState<string | null>(null);
+  const [attachABPdfSrc, setAttachABPdfSrc] = useState<string | null>(null);
   const [attachCPdfSrc, setAttachCPdfSrc] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -83,6 +85,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
     setActiveTab("cert");
     setCertForm(EMPTY_CERT);
     setCertPdfSrc(`/api/generate-report?t=${Date.now()}`);
+    setAttachABPdfSrc(null);
     setAttachCPdfSrc(null);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -191,7 +194,12 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
   }
 
   const amountNum = parseFloat(certForm.amount);
-  const displaySrc = activeTab === "cert" ? certPdfSrc : attachCPdfSrc;
+  const displaySrc =
+    activeTab === "cert"
+      ? certPdfSrc
+      : activeTab === "attachAB"
+        ? attachABPdfSrc
+        : attachCPdfSrc;
 
   return (
     <div
@@ -206,7 +214,11 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
             <span className="text-sm font-semibold text-gray-900">
-              {activeTab === "cert" ? "Financial Report Preview" : "Attachment C Preview"}
+              {activeTab === "cert"
+                ? "Financial Report Preview"
+                : activeTab === "attachAB"
+                  ? "Attachment A & B Preview"
+                  : "Attachment C Preview"}
             </span>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
               <X className="w-4 h-4" />
@@ -216,9 +228,11 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
             <iframe key={displaySrc} src={displaySrc} className="flex-1 w-full border-0" title="Report Preview" />
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-              {activeTab === "attachC"
-                ? "Select expenses to generate a preview"
-                : "Loading…"}
+              {activeTab === "attachAB"
+                ? "Select income entries to generate a preview"
+                : activeTab === "attachC"
+                  ? "Select expenses to generate a preview"
+                  : "Loading…"}
             </div>
           )}
         </div>
@@ -228,7 +242,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
           <div className="px-5 py-4 border-b border-gray-200 shrink-0">
             <h2 className="text-sm font-semibold text-gray-900">Publish Report</h2>
             <div className="flex gap-1 mt-3">
-              {(["cert", "attachC"] as Tab[]).map((tab) => (
+              {(["cert", "attachAB", "attachC"] as Tab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -238,7 +252,11 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
                       : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                   }`}
                 >
-                  {tab === "cert" ? "Certification" : "Attachment C"}
+                  {tab === "cert"
+                    ? "Certification"
+                    : tab === "attachAB"
+                      ? "Attachment A & B"
+                      : "Attachment C"}
                 </button>
               ))}
             </div>
@@ -280,6 +298,10 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
                   <Field label="Name of Auditor" value={certForm.auditor} onChange={(v) => setCert("auditor", v)} onBlur={(v) => refreshCert("auditor", v)} />
                 </div>
               </section>
+            </div>
+
+            <div className={activeTab !== "attachAB" ? "hidden" : ""}>
+              <AttachmentABTab onPdfSrcChange={setAttachABPdfSrc} />
             </div>
 
             <div className={activeTab !== "attachC" ? "hidden" : ""}>
