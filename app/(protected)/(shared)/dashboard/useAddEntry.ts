@@ -137,6 +137,7 @@ export function useAddEntry({
         entry_date: f.date,
         semester_id: semesterId,
       };
+      if (f.receipt && f.receipt_number) payload.receipt_number = f.receipt_number;
       if (balance.faculty_code) payload.faculty_code = balance.faculty_code;
       else payload.campus_code = balance.campus_code;
 

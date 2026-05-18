@@ -17,25 +17,37 @@ import {
   setupPage,
   ensurePage,
   drawPreparedBy,
-} from "./pdf-helpers";
-import {
-  type ExpEntry,
-  STD_COLS,
-  REIMB_COLS,
-  STD_HEADERS,
-  REIMB_HEADERS,
-  buildRows,
-  getPreset,
-} from "./data";
+} from "../generate-attachment-c/pdf-helpers";
+import { type ExpEntry } from "../generate-attachment-c/data";
+import { fmtDate } from "../generate-attachment-c/pdf-helpers";
+
+// Income entries: no OR/TR No. column
+const INC_COLS = [70, 160, 60, 45, 70]; // Date, Description, Unit Price, Qty, Amount
+const INC_HEADERS = ["Date", "Description", "Unit Price", "Qty", "Amount"];
+
+function buildIncomeRows(entries: ExpEntry[]): string[][] {
+  return entries.map((e) => [
+    fmtDate(e.entry_date ?? ""),
+    e.description ?? "",
+    fmt(Number(e.unit_price) || 0),
+    String(Number(e.quantity) || 0),
+    fmt(Number(e.total_price) || 0),
+  ]);
+}
 
 const LEFT = 40,
   CONTENT_TOP = 680,
   CONTENT_BOT = 80;
 
+// Label | No. of Students | Amount (Php) | Total (Php)
+const AB_COLS = [130, 90, 90, 90];
+
 type CustomTable = { title: string; entryIds: string[] };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const sectionTitleA = searchParams.get("sectionTitleA") ?? "";
+  const sectionTitleB = searchParams.get("sectionTitleB") ?? "";
   const preparedByName = searchParams.get("preparedByName") ?? "";
   const preparedByPosition = searchParams.get("preparedByPosition") ?? "";
 
@@ -51,7 +63,7 @@ export async function GET(request: Request) {
 
   if (allIds.length === 0) {
     const templateBytes = fs.readFileSync(
-      path.join(process.cwd(), "public", "attachment-c-template.pdf"),
+      path.join(process.cwd(), "public", "attachment-a-b-template.pdf"),
     );
     return new NextResponse(Buffer.from(templateBytes), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline" },
@@ -96,29 +108,58 @@ export async function GET(request: Request) {
     .single();
   if (!sem) return new NextResponse("No active semester", { status: 404 });
 
-  let expQ = supabase
+  // Attachment A: income entries
+  let incQ = supabase
     .from("entries")
-    .select(
-      "id, entry_date, control_number, receipt_number, description, unit_price, quantity, total_price",
-    )
+    .select("id, entry_date, control_number, description, unit_price, quantity, total_price")
     .in("id", allIds)
     .eq("semester_id", sem.id)
-    .eq("category", "expense")
+    .eq("category", "income")
     .order("entry_date", { ascending: true });
-  if (faculty_code) expQ = expQ.eq("faculty_code", faculty_code);
-  else expQ = expQ.eq("campus_code", campus_code!);
-  const { data: raw } = await expQ;
+  if (faculty_code) incQ = incQ.eq("faculty_code", faculty_code);
+  else incQ = incQ.eq("campus_code", campus_code!);
+  const { data: incomeRaw } = await incQ;
 
   const entryMap = new Map<string, ExpEntry>(
-    (raw ?? []).map((e) => [String(e.id), e as ExpEntry]),
+    (incomeRaw ?? []).map((e) => [String(e.id), e as ExpEntry]),
   );
 
+  // Attachment B: balance card + fines paid
+  let bcQ = supabase
+    .from("balance_cards")
+    .select("fine_amount, total_students_with_fines");
+  if (faculty_code) bcQ = bcQ.eq("faculty_code", faculty_code);
+  else bcQ = bcQ.eq("campus_code", campus_code!).is("faculty_code", null);
+  const { data: bc } = await bcQ.maybeSingle();
+
+  let finesQ = supabase
+    .from("entries")
+    .select("quantity")
+    .eq("semester_id", sem.id)
+    .eq("category", "income")
+    .eq("description", "Fines")
+    .eq("is_deleted", false);
+  if (faculty_code) finesQ = finesQ.eq("faculty_code", faculty_code);
+  else finesQ = finesQ.eq("campus_code", campus_code!);
+  const { data: finesData } = await finesQ;
+
+  const fineStudentsPaid = (finesData ?? []).reduce(
+    (sum, r) => sum + (Number(r.quantity) || 0),
+    0,
+  );
+  const fineAmount = Number(bc?.fine_amount) || 0;
+  const totalStudents = Number(bc?.total_students_with_fines) || 0;
+  const remaining = Math.max(0, totalStudents - fineStudentsPaid);
+  const collected = fineStudentsPaid * fineAmount;
+  const collectibles = remaining * fineAmount;
+  const grandTotal = collected + collectibles;
+
+  // Build PDF
   const pdfDoc = await PDFDocument.load(
     fs.readFileSync(
-      path.join(process.cwd(), "public", "attachment-c-template.pdf"),
+      path.join(process.cwd(), "public", "attachment-a-b-template.pdf"),
     ),
   );
-  // Strip extra template pages so ensurePage always copies the clean page 0
   while (pdfDoc.getPageCount() > 1) pdfDoc.removePage(1);
 
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -142,10 +183,7 @@ export async function GET(request: Request) {
   let currentPage = pdfDoc.getPages()[0];
   setup(currentPage);
 
-  function coverTemplatePlaceholders(pg: DrawPage) {
-    // Cover only the narrow band between the header bottom and CONTENT_TOP where
-    // the template has placeholder text (ATTACHMENT C, TABLE 1, etc.).
-    // height: 80 reaches from CONTENT_TOP up to ~y=760, below the logo at ~y=760+.
+  function coverPlaceholders(pg: DrawPage) {
     pg.drawRectangle({ x: 0, y: CONTENT_TOP, width, height: 50, color: WHITE });
   }
 
@@ -153,30 +191,38 @@ export async function GET(request: Request) {
     if (curY - neededH < CONTENT_BOT + 10) {
       currentPage = await ensurePage(pdfDoc, ++pageIndex);
       setup(currentPage);
-      coverTemplatePlaceholders(currentPage);
+      coverPlaceholders(currentPage);
       curY = CONTENT_TOP;
     }
   }
 
+  // ── Attachment A section title ──
+  if (sectionTitleA) {
+    const aTitleLines = wrapText(sectionTitleA, CONTENT_W, boldFont, 11);
+    const aTitleH = aTitleLines.length * 14;
+    await ensureSpace(aTitleH + 10);
+    for (const line of aTitleLines) {
+      centerText(currentPage, line, curY, width, boldFont, 11);
+      curY -= 14;
+    }
+    curY -= 10;
+  }
+
+  // ── Attachment A tables ──
   for (const ct of customTables) {
     const entries = ct.entryIds
       .map((id) => entryMap.get(id))
       .filter(Boolean) as ExpEntry[];
     if (entries.length === 0) continue;
 
-    const isReimb = entries.every(
-      (e) => getPreset(e.description ?? "") === "Reimbursement",
-    );
-    const colWidths = isReimb ? REIMB_COLS : STD_COLS;
     const total = entries.reduce((s, e) => s + (Number(e.total_price) || 0), 0);
     const tableRows: string[][] = [
-      isReimb ? REIMB_HEADERS : STD_HEADERS,
-      ...buildRows(entries, isReimb),
-      ["TOTAL", ...Array(colWidths.length - 2).fill(""), fmt(total)],
+      INC_HEADERS,
+      ...buildIncomeRows(entries),
+      ["TOTAL", ...Array(INC_COLS.length - 2).fill(""), fmt(total)],
     ];
     const titleLines = wrapText(ct.title, CONTENT_W, boldFont, 11);
     const titleH = titleLines.length * 14;
-    // Ensure space for title + at least header + 1 data row
     await ensureSpace(titleH + 4 + ROW_H * 2);
     for (const line of titleLines) {
       centerText(currentPage, line, curY, width, boldFont, 11);
@@ -184,59 +230,122 @@ export async function GET(request: Request) {
     }
     curY -= 4;
 
-    // Paginate table rows: header row + data rows + total row
     const headerRow = tableRows[0];
     const dataRows = tableRows.slice(1, -1);
     const totalRow = tableRows[tableRows.length - 1];
-    const tableX = LEFT + (CONTENT_W - colWidths.reduce((a, b) => a + b, 0)) / 2;
-    const rightAlign = isReimb ? [3] : [3, 4, 5];
+    const tableX = LEFT + (CONTENT_W - INC_COLS.reduce((a, b) => a + b, 0)) / 2;
+    const rightAlign = [2, 3, 4]; // Unit Price, Qty, Amount
     const allDataHeights = computeRowHeights(
       [headerRow, ...dataRows],
-      colWidths,
+      INC_COLS,
       font,
-      2,
+      1, // Description is at index 1
       false,
-    ).slice(1); // drop header height, keep only data row heights
+    ).slice(1);
 
     let di = 0;
     while (di <= dataRows.length) {
-      // Collect data rows that fit on current page (reserve space for header + total)
       const reserved = ROW_H * 2;
       const available = curY - CONTENT_BOT - 10;
       if (available < reserved) {
         currentPage = await ensurePage(pdfDoc, ++pageIndex);
         setup(currentPage);
-        coverTemplatePlaceholders(currentPage);
+        coverPlaceholders(currentPage);
         curY = CONTENT_TOP;
       }
       const avail2 = curY - CONTENT_BOT - 10 - reserved;
-      let usedH = 0;
-      let count = 0;
-      while (di + count < dataRows.length && usedH + allDataHeights[di + count] <= avail2) {
+      let usedH = 0,
+        count = 0;
+      while (
+        di + count < dataRows.length &&
+        usedH + allDataHeights[di + count] <= avail2
+      ) {
         usedH += allDataHeights[di + count];
         count++;
       }
-      // Force at least 1 data row to avoid infinite loop
       if (count === 0 && di < dataRows.length) count = 1;
-
       const isLast = di + count >= dataRows.length;
       const segData = dataRows.slice(di, di + count);
       const segRows = [headerRow, ...segData, ...(isLast ? [totalRow] : [])];
-      const segH = ROW_H + allDataHeights.slice(di, di + count).reduce((a, b) => a + b, 0) + (isLast ? ROW_H : 0);
-
-      drawTable(currentPage, tableX, curY, colWidths, segRows, font, boldFont, rightAlign, 2, isLast);
+      const segH =
+        ROW_H +
+        allDataHeights.slice(di, di + count).reduce((a, b) => a + b, 0) +
+        (isLast ? ROW_H : 0);
+      drawTable(
+        currentPage,
+        tableX,
+        curY,
+        INC_COLS,
+        segRows,
+        font,
+        boldFont,
+        rightAlign,
+        1, // Description is at index 1
+        isLast,
+      );
       curY -= segH;
       di += count;
-
       if (isLast) break;
       currentPage = await ensurePage(pdfDoc, ++pageIndex);
       setup(currentPage);
-      coverTemplatePlaceholders(currentPage);
+      coverPlaceholders(currentPage);
       curY = CONTENT_TOP;
     }
     curY -= 20;
   }
 
+  // ── Attachment B ──
+  curY -= 10;
+
+  // Attachment B section title
+  if (sectionTitleB) {
+    const bSecLines = wrapText(sectionTitleB, CONTENT_W, boldFont, 11);
+    const bSecH = bSecLines.length * 14;
+    await ensureSpace(bSecH + 10);
+    for (const line of bSecLines) {
+      centerText(currentPage, line, curY, width, boldFont, 11);
+      curY -= 14;
+    }
+    curY -= 10;
+  }
+
+  const bTitle = "TABLE OF SUMMARY OF COLLECTIONS";
+  const bTitleLines = wrapText(bTitle, CONTENT_W, boldFont, 11);
+  const bTitleH = bTitleLines.length * 14;
+  const bTableRows: string[][] = [
+    ["", "No. of Students", "Amount (Php)", "Total (Php)"],
+    ["Collected", String(fineStudentsPaid), fmt(fineAmount), fmt(collected)],
+    ["Collectibles", String(remaining), fmt(fineAmount), fmt(collectibles)],
+    ["Grand Total", "", "", fmt(grandTotal)],
+  ];
+  const bTableH = computeRowHeights(bTableRows, AB_COLS, font, 0, true).reduce(
+    (a, b) => a + b,
+    0,
+  );
+  await ensureSpace(bTitleH + 4 + bTableH + 10);
+
+  for (const line of bTitleLines) {
+    centerText(currentPage, line, curY, width, boldFont, 11);
+    curY -= 14;
+  }
+  curY -= 4;
+
+  const bTableX = LEFT + (CONTENT_W - AB_COLS.reduce((a, b) => a + b, 0)) / 2;
+  drawTable(
+    currentPage,
+    bTableX,
+    curY,
+    AB_COLS,
+    bTableRows,
+    font,
+    boldFont,
+    [1, 2, 3],
+    0,
+    true,
+  );
+  curY -= bTableH + 20;
+
+  // ── Prepared by ──
   await ensureSpace(70);
   const orgCode = faculty_code ?? campus_code ?? "";
   const designation = [orgCode, orgCode ? "- SEB" : "SEB", preparedByPosition]

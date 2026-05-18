@@ -30,6 +30,7 @@ export type FormState = {
   unit_price: string;
   quantity: string;
   receipt?: File | null;
+  receipt_number?: string;
 };
 
 export const emptyForm: FormState = {
@@ -41,6 +42,7 @@ export const emptyForm: FormState = {
   unit_price: "",
   quantity: "",
   receipt: null,
+  receipt_number: "",
 };
 
 function formatPeso(amount: number) {
@@ -214,13 +216,22 @@ function EntryFormFields({
             </span>
           </label>
           {form.receipt && (
-            <button
-              type="button"
-              onClick={() => onChange({ ...form, receipt: null })}
-              className="text-xs text-red-400 hover:text-red-600 text-left"
-            >
-              Remove receipt
-            </button>
+            <>
+              <input
+                type="text"
+                value={form.receipt_number ?? ""}
+                onChange={(e) => onChange({ ...form, receipt_number: e.target.value })}
+                placeholder="Receipt number"
+                className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300"
+              />
+              <button
+                type="button"
+                onClick={() => onChange({ ...form, receipt: null, receipt_number: "" })}
+                className="text-xs text-red-400 hover:text-red-600 text-left"
+              >
+                Remove receipt
+              </button>
+            </>
           )}
         </div>
       )}

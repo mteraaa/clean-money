@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
 import { toast } from "sonner";
@@ -51,6 +51,15 @@ export function useBalanceActions({
   const [fineAmtInput, setFineAmtInput] = useState("");
   const [fineTotalInput, setFineTotalInput] = useState("");
   const [fineSaving, setFineSaving] = useState(false);
+  const [finesAdded, setFinesAdded] = useState(false);
+  const prevFineStudentsPaid = useRef(fineStudentsPaid);
+
+  useEffect(() => {
+    if (prevFineStudentsPaid.current !== fineStudentsPaid) {
+      prevFineStudentsPaid.current = fineStudentsPaid;
+      setFinesAdded(false);
+    }
+  }, [fineStudentsPaid]);
 
   function openCalc(action: BankAction) {
     setBankAction(action);
@@ -76,6 +85,7 @@ export function useBalanceActions({
     setColl(value);
     setPrevColl(null);
     collToastId.current = null;
+    setFinesAdded(false);
   }
 
   async function executeUndoBank(value: { bank: number; hand: number }) {
@@ -207,6 +217,7 @@ export function useBalanceActions({
     setTotalFineStudents(total);
     setFineSaving(false);
     setFineEditOpen(false);
+    setFinesAdded(false);
     toast.success("Fine details updated");
   }
 
@@ -231,6 +242,7 @@ export function useBalanceActions({
       .then((id) => { collLogId.current = id ?? null; }).catch(() => {});
     const id = toast.success(desc, { action: { label: "Undo", onClick: () => executeUndoColl(saved) } });
     collToastId.current = id;
+    setFinesAdded(true);
   }
 
   return {
@@ -245,6 +257,7 @@ export function useBalanceActions({
     // fines
     fineAmt, totalFineStudents,
     fineEditOpen, fineAmtInput, fineTotalInput, fineSaving,
+    finesAdded,
     openFineEdit, closeFineEdit,
     setFineAmtInput, setFineTotalInput,
     saveFineEdit,
