@@ -12,6 +12,7 @@ export type ExpEntry = {
   id: string;
   entry_date: string | null;
   control_number: number | null;
+  receipt_number: string | null;
   description: string | null;
   unit_price: number | null;
   quantity: number | null;
@@ -37,7 +38,7 @@ export function buildRows(entries: ExpEntry[], isReimb: boolean): string[][] {
       const { payee, desc } = parseReimbursement(e.description ?? "");
       return [date, payee, desc, amt];
     }
-    return [date, String(e.control_number ?? ""), e.description ?? "", fmt(Number(e.unit_price) || 0), String(Number(e.quantity) || 0), amt];
+    return [date, e.receipt_number ?? "-", e.description ?? "", fmt(Number(e.unit_price) || 0), String(Number(e.quantity) || 0), amt];
   });
 }
 

@@ -99,7 +99,7 @@ export async function GET(request: Request) {
   let expQ = supabase
     .from("entries")
     .select(
-      "id, entry_date, control_number, description, unit_price, quantity, total_price",
+      "id, entry_date, control_number, receipt_number, description, unit_price, quantity, total_price",
     )
     .in("id", allIds)
     .eq("semester_id", sem.id)
