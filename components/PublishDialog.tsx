@@ -123,6 +123,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       ]);
       if (!userData) throw new Error("User data not found");
       if (!sem) throw new Error("No active semester");
+      const semId = sem.id;
 
       const ayRaw = sem.academic_years;
       const yearLabel = ((Array.isArray(ayRaw) ? ayRaw[0] : ayRaw) as { year_label?: string } | null)?.year_label ?? "";
@@ -176,7 +177,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
           file_path: filePath,
           published_at: new Date().toISOString(),
           published_by: userId,
-          semester_id: sem.id,
+          semester_id: semId,
         };
         if (userData.faculty_code) record.faculty_code = userData.faculty_code;
         else record.campus_code = userData.campus_code;
@@ -188,7 +189,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       await saveToArchives(attachABPdfSrc, "Attachment A&B", pdfsBasePath);
       await saveToArchives(attachCPdfSrc, "Attachment C", pdfsBasePath);
 
-      const existingQ = supabase.from("reports").select("id").eq("semester_id", sem.id);
+      const existingQ = supabase.from("reports").select("id").eq("semester_id", semId);
       if (userData.faculty_code) existingQ.eq("faculty_code", userData.faculty_code);
       else existingQ.eq("campus_code", userData.campus_code);
       const { data: existing } = await existingQ.maybeSingle();
@@ -212,7 +213,7 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
       const record: Record<string, unknown> = {
         title, original_name: fileName, stored_name: fileName,
         mime_type: "application/pdf", file_path: mainPath,
-        published_at: new Date().toISOString(), published_by: userId, semester_id: sem.id,
+        published_at: new Date().toISOString(), published_by: userId, semester_id: semId,
       };
       if (summaryFilePath) record.summary_file_path = summaryFilePath;
       if (userData.faculty_code) record.faculty_code = userData.faculty_code;
@@ -225,11 +226,11 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         description: `Published financial report: ${title}`,
         action: "PUBLISH_REPORT", module: "REPORTS",
         facultyCode: userData.faculty_code, campusCode: userData.campus_code,
-        targetTable: "reports", targetId: insertData.id,
+        targetTable: "reports", targetId: insertData?.id,
       }).catch(() => {});
 
       toast.success("Financial report published successfully");
-      onPublishSuccess?.({ id: insertData.id, file_path: mainPath, bucket });
+      onPublishSuccess?.({ id: insertData?.id, file_path: mainPath, bucket });
       onClose();
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : "An error occurred");
