@@ -1,5 +1,6 @@
 import type { PDFDocument } from "pdf-lib";
-import { type DrawPage, type Font, centerText, wrapText, computeRowHeights, drawTable, ensurePage, fmtDate, fmt, ROW_H } from "../generate-attachment-c/pdf-helpers";
+import { type DrawPage, type Font, centerText, wrapText, ensurePage, fmtDate, fmt, ROW_H } from "../generate-attachment-c/pdf-helpers";
+import { computeRowHeights, drawTable } from "../generate-attachment-c/pdf-table";
 import type { ExpEntry } from "../generate-attachment-c/data";
 import type { FinesCalc } from "./data";
 
