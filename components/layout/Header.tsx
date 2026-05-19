@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type HeaderData = {
@@ -75,7 +74,6 @@ export default function Header() {
   return (
     <header className="bg-[#fafafa] px-4 py-4 md:px-10 md:py-6 shadow-[0px_4px_10px_0px_rgba(74,85,104,0.2)] relative z-10">
       <div className="flex items-center gap-3">
-        <SidebarTrigger className="md:hidden shrink-0" />
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
           {data ? (
             <>
