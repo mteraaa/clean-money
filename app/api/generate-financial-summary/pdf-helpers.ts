@@ -70,7 +70,7 @@ export async function buildSummaryPdf(d: SummaryData): Promise<Uint8Array> {
   }
 
   const headerLine = d.isCampusOnly
-    ? `STUDENT ELECTION BOARD – ${d.orgName.toUpperCase()}`
+    ? d.orgName.toUpperCase()
     : `${d.orgName.toUpperCase()} – STUDENT ELECTION BOARD`;
   centerDraw(headerLine, boldFont, 10);
   centerDraw(`${d.semName}, ${d.yearLabel} FINANCIAL REPORT`, boldFont, 10);

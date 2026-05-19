@@ -73,7 +73,7 @@ export async function GET() {
       .select("name")
       .eq("campus_code", campus_code!)
       .single();
-    orgName = cam?.name ?? "";
+    orgName = `Student Election Board - ${cam?.name ?? ""}`;
   }
 
   // Aggregate income by description
