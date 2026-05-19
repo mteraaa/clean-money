@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardSkeleton() {
   return (
-    <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
+    <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6 animate-fade-in-up">
       {/* WelcomeCard skeleton */}
       <div className="bg-white rounded-xl shadow-md px-4 py-3 md:px-6 md:py-4 flex flex-wrap items-center justify-between gap-3 mb-4">
         <Skeleton className="h-6 w-56" />
@@ -21,12 +21,12 @@ export default function DashboardSkeleton() {
         {/* 2x2 grid */}
         <div className="flex flex-col gap-2 w-full sm:flex-row sm:w-2/3">
           <div className="flex flex-col gap-4 flex-1">
-            <Skeleton className="h-[4.5rem] rounded-xl" />
-            <Skeleton className="h-[4.5rem] rounded-xl" />
+            <Skeleton className="h-18 rounded-xl" />
+            <Skeleton className="h-18 rounded-xl" />
           </div>
           <div className="flex flex-col gap-4 flex-1">
-            <Skeleton className="h-[4.5rem] rounded-xl" />
-            <Skeleton className="h-[4.5rem] rounded-xl" />
+            <Skeleton className="h-18 rounded-xl" />
+            <Skeleton className="h-18 rounded-xl" />
           </div>
         </div>
       </div>

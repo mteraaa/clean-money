@@ -40,7 +40,7 @@ export default function DashboardPage() {
   if (isLoading) return <DashboardSkeleton />;
 
   return (
-    <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
+    <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6 animate-fade-in-up">
       <WelcomeCard
         name={userName}
         isPublished={!!publishedReport}
