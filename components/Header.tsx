@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type HeaderData = {
   org_name: string;
@@ -76,13 +77,17 @@ export default function Header() {
       <div className="flex items-center gap-3">
         <SidebarTrigger className="md:hidden shrink-0" />
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-          <span className="font-lexend-exa font-bold text-base md:text-xl tracking-wide uppercase truncate">
-            VSU - {data?.org_name ?? ""}
-          </span>
-          {data && (
-            <span className="text-gray-400 text-xs md:text-sm font-inter shrink-0">
-              {data.year_label} | {data.semester_name}
-            </span>
+          {data ? (
+            <>
+              <span className="font-lexend-exa font-bold text-base md:text-xl tracking-wide uppercase truncate">
+                VSU - {data.org_name}
+              </span>
+              <span className="text-gray-400 text-xs md:text-sm font-inter shrink-0">
+                {data.year_label} | {data.semester_name}
+              </span>
+            </>
+          ) : (
+            <Skeleton className="h-5 w-48" />
           )}
         </div>
       </div>
