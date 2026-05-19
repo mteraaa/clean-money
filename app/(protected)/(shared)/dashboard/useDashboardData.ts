@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import type { Balance, PublishedReport, SemesterMeta } from "./types";
 
 export function useDashboardData() {
+  const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState<string>("");
   const [balance, setBalance] = useState<Balance | null>(null);
   const [hasBalanceRow, setHasBalanceRow] = useState(false);
@@ -118,6 +119,8 @@ export function useDashboardData() {
           bucket: userData.faculty_code ? "Faculties" : "Campus SEB",
         });
       }
+
+      setIsLoading(false);
     })();
   }, []);
 
@@ -148,6 +151,7 @@ export function useDashboardData() {
   }
 
   return {
+    isLoading,
     userName,
     balance, setBalance,
     hasBalanceRow, setHasBalanceRow,

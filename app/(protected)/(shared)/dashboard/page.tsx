@@ -10,9 +10,11 @@ import InitialBalanceSetupCard from "@/components/InitialBalanceSetupCard";
 import PDFViewerCard from "@/components/PDFViewerCard";
 import PublishDialog from "@/components/PublishDialog";
 import UnpublishDialog from "@/components/UnpublishDialog";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 
 export default function DashboardPage() {
   const {
+    isLoading,
     userName,
     balance, setBalance,
     hasBalanceRow, setHasBalanceRow,
@@ -34,6 +36,8 @@ export default function DashboardPage() {
   } = useDashboard();
 
   const isLocked = !!publishedReport || isSemesterEnded;
+
+  if (isLoading) return <DashboardSkeleton />;
 
   return (
     <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
