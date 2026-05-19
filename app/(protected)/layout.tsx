@@ -1,7 +1,7 @@
-import AppSidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
+import AppSidebar from "@/components/layout/Sidebar";
+import Header from "@/components/layout/Header";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import AppToaster from "@/components/AppToaster";
+import AppToaster from "@/components/layout/AppToaster";
 
 export default function ProtectedLayout({
   children,

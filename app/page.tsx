@@ -129,7 +129,7 @@ export default function Home() {
         </div>
 
         {/* Hero content — pulled up with -mt-64 so the viewer section peeks in */}
-        <div className="relative z-10 flex flex-col items-center text-center max-w-4xl px-6 -mt-96">
+        <div className="relative z-10 flex flex-col items-center text-center max-w-4xl px-6 -mt-96 animate-fade-in-up">
           {/* Logo */}
           <img
             src="/logo.png"
@@ -181,7 +181,7 @@ export default function Home() {
       {/* -mt-[200px] pulls this section up so it overlaps the hero */}
       <section
         ref={viewerRef}
-        className="relative w-full max-w-7xl mx-auto px-6 pb-12 -mt-64 z-20"
+        className="relative w-full max-w-7xl mx-auto px-6 pb-12 -mt-64 z-20 animate-fade-in-up"
       >
         {/* Filters */}
         <div className="flex flex-col md:flex-row gap-6 mb-8">

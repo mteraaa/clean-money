@@ -1,18 +1,20 @@
 "use client";
 
 import { useDashboard } from "./useDashboard";
-import BalanceCards from "@/components/BalanceCards";
-import WelcomeCard from "@/components/WelcomeCard";
-import IncomeEntriesTable from "@/components/IncomeEntriesTable";
-import ExpenseEntriesTable from "@/components/ExpenseEntriesTable";
-import AddEntrySheet from "@/components/AddEntrySheet";
-import InitialBalanceSetupCard from "@/components/InitialBalanceSetupCard";
-import PDFViewerCard from "@/components/PDFViewerCard";
-import PublishDialog from "@/components/PublishDialog";
-import UnpublishDialog from "@/components/UnpublishDialog";
+import BalanceCards from "@/components/balance/BalanceCards";
+import WelcomeCard from "@/components/auth/WelcomeCard";
+import IncomeEntriesTable from "@/components/entries/IncomeEntriesTable";
+import ExpenseEntriesTable from "@/components/entries/ExpenseEntriesTable";
+import AddEntrySheet from "@/components/entries/AddEntrySheet";
+import InitialBalanceSetupCard from "@/components/balance/InitialBalanceSetupCard";
+import PDFViewerCard from "@/components/reports/PDFViewerCard";
+import PublishDialog from "@/components/reports/PublishDialog";
+import UnpublishDialog from "@/components/reports/UnpublishDialog";
+import DashboardSkeleton from "@/components/layout/DashboardSkeleton";
 
 export default function DashboardPage() {
   const {
+    isLoading,
     userName,
     balance, setBalance,
     hasBalanceRow, setHasBalanceRow,
@@ -35,8 +37,10 @@ export default function DashboardPage() {
 
   const isLocked = !!publishedReport || isSemesterEnded;
 
+  if (isLoading) return <DashboardSkeleton />;
+
   return (
-    <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6">
+    <div className="bg-[#f3f4f6] min-h-full px-4 pt-3 pb-6 animate-fade-in-up">
       <WelcomeCard
         name={userName}
         isPublished={!!publishedReport}
