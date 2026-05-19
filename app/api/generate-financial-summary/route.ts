@@ -110,6 +110,7 @@ export async function GET() {
 
   const pdfBytes = await buildSummaryPdf({
     orgName,
+    isCampusOnly: !faculty_code,
     semName,
     yearLabel,
     initialBal,
