@@ -9,20 +9,21 @@ import PublishedFilesTable, {
 
 export default function ArchivesPage() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
   const [files, setFiles] = useState<PublishedFile[]>([]);
   const [bucketName, setBucketName] = useState<string>("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setIsLoading(false); return; }
 
     const { data: userData } = await supabase
       .from("users")
       .select("faculty_code, campus_code")
       .eq("auth_id", user.id)
       .single();
-    if (!userData) return;
+    if (!userData) { setIsLoading(false); return; }
 
     const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
     setBucketName(bucket);
@@ -77,6 +78,7 @@ export default function ArchivesPage() {
     );
 
     setFiles(combined);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -111,11 +113,15 @@ export default function ArchivesPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-full p-4 md:p-8">
-      <PublishedFilesTable
-        files={files}
-        onFolderClick={(id) => router.push(`/archives/${id}`)}
-        onDelete={handleDelete}
-      />
+      {!isLoading && (
+        <div className="animate-fade-in-up">
+          <PublishedFilesTable
+            files={files}
+            onFolderClick={(id) => router.push(`/archives/${id}`)}
+            onDelete={handleDelete}
+          />
+        </div>
+      )}
     </div>
   );
 }

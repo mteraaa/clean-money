@@ -7,20 +7,21 @@ import PublishedFilesTable, {
 } from "@/components/PublishedFilesTable";
 
 export default function ReportsPage() {
+  const [isLoading, setIsLoading] = useState(true);
   const [files, setFiles] = useState<PublishedFile[]>([]);
   const [bucketName, setBucketName] = useState<string>("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setIsLoading(false); return; }
 
     const { data: userData } = await supabase
       .from("users")
       .select("faculty_code, campus_code")
       .eq("auth_id", user.id)
       .single();
-    if (!userData) return;
+    if (!userData) { setIsLoading(false); return; }
 
     const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
     setBucketName(bucket);
@@ -52,6 +53,7 @@ export default function ReportsPage() {
     );
 
     setFiles(mapped);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -71,7 +73,11 @@ export default function ReportsPage() {
 
   return (
     <div className="bg-[#f3f4f6] min-h-full p-4 md:p-8">
-      <PublishedFilesTable files={files} onDelete={handleDelete} />
+      {!isLoading && (
+        <div className="animate-fade-in-up">
+          <PublishedFilesTable files={files} onDelete={handleDelete} />
+        </div>
+      )}
     </div>
   );
 }

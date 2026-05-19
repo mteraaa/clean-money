@@ -11,6 +11,7 @@ import { ChevronLeft } from "lucide-react";
 export default function ReceiptFolderPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
   const [folderName, setFolderName] = useState("");
   const [files, setFiles] = useState<PublishedFile[]>([]);
 
@@ -21,7 +22,7 @@ export default function ReceiptFolderPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setIsLoading(false); return; }
 
       const { data: userData } = await supabase
         .from("users")
@@ -29,7 +30,7 @@ export default function ReceiptFolderPage() {
         .eq("auth_id", user.id)
         .single();
 
-      if (!userData) return;
+      if (!userData) { setIsLoading(false); return; }
 
       const bucket = userData.faculty_code ? "Faculties" : "Campus SEB";
 
@@ -66,20 +67,25 @@ export default function ReceiptFolderPage() {
       );
 
       setFiles(mapped);
+      setIsLoading(false);
     })();
   }, [id]);
 
   return (
     <div className="bg-[#f3f4f6] min-h-full p-4 md:p-8">
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-1 text-sm font-inter text-gray-500 hover:text-gray-800 mb-4"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Back to Archives
-      </button>
-      <h2 className="font-inter font-semibold text-lg mb-4">{folderName}</h2>
-      <PublishedFilesTable files={files} />
+      {!isLoading && (
+        <div className="animate-fade-in-up">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1 text-sm font-inter text-gray-500 hover:text-gray-800 mb-4"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Archives
+          </button>
+          <h2 className="font-inter font-semibold text-lg mb-4">{folderName}</h2>
+          <PublishedFilesTable files={files} />
+        </div>
+      )}
     </div>
   );
 }
