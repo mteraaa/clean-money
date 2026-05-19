@@ -106,12 +106,12 @@ export default function PublishDialog({ open, onClose, onPublishSuccess }: Props
         <div className="w-80 border-l border-gray-200 flex flex-col shrink-0">
           <div className="px-5 py-4 border-b border-gray-200 shrink-0">
             <h2 className="text-sm font-semibold text-gray-900">Publish Report</h2>
-            <div className="flex gap-1 mt-3 flex-wrap">
-              {(["cert", "attachAB", "attachC", "public"] as Tab[]).map((tab) => (
+            <div className="grid grid-cols-2 gap-1 mt-3">
+              {(["cert", "public", "attachAB", "attachC"] as Tab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  className={`py-1.5 text-xs font-medium rounded-lg transition-colors ${
                     activeTab === tab ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                   }`}
                 >
