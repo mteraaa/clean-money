@@ -18,6 +18,7 @@ function fmt(n: number) {
 
 export type SummaryData = {
   orgName: string;
+  isCampusOnly?: boolean;
   semName: string;
   yearLabel: string;
   initialBal: number;
@@ -68,7 +69,10 @@ export async function buildSummaryPdf(d: SummaryData): Promise<Uint8Array> {
     y -= LINE_H;
   }
 
-  centerDraw(`${d.orgName.toUpperCase()} – STUDENT ELECTION BOARD`, boldFont, 10);
+  const headerLine = d.isCampusOnly
+    ? `STUDENT ELECTION BOARD – ${d.orgName.toUpperCase()}`
+    : `${d.orgName.toUpperCase()} – STUDENT ELECTION BOARD`;
+  centerDraw(headerLine, boldFont, 10);
   centerDraw(`${d.semName}, ${d.yearLabel} FINANCIAL REPORT`, boldFont, 10);
   y -= LINE_H * 2;
 
