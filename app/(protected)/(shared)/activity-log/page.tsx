@@ -23,7 +23,7 @@ export default function ActivityLogPage() {
         .single();
       if (!userData) { setIsLoading(false); return; }
 
-      const q = supabase
+      let q = supabase
         .from("activity_logs")
         .select("id, description, logged_at")
         .order("logged_at", { ascending: false })
