@@ -63,6 +63,7 @@ function EntryFormFields({
   errors,
   onClearError,
   onRemove,
+  descriptionOnly = false,
 }: {
   index: number;
   baseControlNumber: number;
@@ -71,6 +72,7 @@ function EntryFormFields({
   errors: Record<string, boolean>;
   onClearError: (key: string) => void;
   onRemove?: () => void;
+  descriptionOnly?: boolean;
 }) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const isReimbursement = form.category === "expense" && form.description_preset === "Reimbursement";
@@ -95,8 +97,9 @@ function EntryFormFields({
         <label className="text-sm text-gray-500">Category</label>
         <select
           value={form.category}
+          disabled={descriptionOnly}
           onChange={(e) => onChange({ ...form, category: e.target.value as "income" | "expense", description_preset: "", description_other: "", payee: "" })}
-          className={`border rounded-lg px-4 pr-10 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-gray-300 font-medium ${errors.category && !form.category ? "border-red-500" : form.category === "income" ? "border-green-500" : form.category === "expense" ? "border-red-500" : "border-gray-200"} ${form.category === "income" ? "text-green-600" : form.category === "expense" ? "text-red-500" : "text-gray-400"}`}
+          className={`border rounded-lg px-4 pr-10 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-gray-300 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.category && !form.category ? "border-red-500" : form.category === "income" ? "border-green-500" : form.category === "expense" ? "border-red-500" : "border-gray-200"} ${form.category === "income" ? "text-green-600" : form.category === "expense" ? "text-red-500" : "text-gray-400"}`}
         >
           <option value="" disabled>Select category</option>
           <option value="income">Income</option>
@@ -108,7 +111,7 @@ function EntryFormFields({
         <label className="text-sm text-gray-500">Description</label>
         <select
           value={form.description_preset}
-          disabled={!form.category}
+          disabled={!form.category || descriptionOnly}
           onChange={(e) => {
             onChange({ ...form, description_preset: e.target.value, description_other: "", payee: "" });
             onClearError("description");
@@ -136,9 +139,10 @@ function EntryFormFields({
           <input
             type="text"
             value={form.payee}
+            disabled={descriptionOnly}
             onChange={(e) => onChange({ ...form, payee: e.target.value })}
             placeholder="Payee"
-            className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 mt-1"
+            className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 mt-1 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
           />
         )}
       </div>
@@ -147,7 +151,7 @@ function EntryFormFields({
         <label className="text-sm text-gray-500">Date</label>
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
-            <button className={`flex items-center justify-between border rounded-lg px-4 py-3 text-sm outline-none text-left ${errors.date ? "border-red-500" : "border-gray-200"}`}>
+            <button disabled={descriptionOnly} className={`flex items-center justify-between border rounded-lg px-4 py-3 text-sm outline-none text-left disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.date ? "border-red-500" : "border-gray-200"}`}>
               <span className={form.date ? "text-gray-900" : "text-gray-400"}>
                 {form.date
                   ? new Date(form.date).toLocaleDateString("en-PH", { month: "short", day: "2-digit", year: "numeric" })
@@ -182,9 +186,10 @@ function EntryFormFields({
             type="number"
             min="0"
             value={form.unit_price}
+            disabled={descriptionOnly}
             onChange={(e) => { onChange({ ...form, unit_price: e.target.value }); onClearError("unit_price"); }}
             placeholder="0.00"
-            className={`border rounded-lg pl-8 pr-4 py-3 text-sm w-full outline-none focus:ring-2 focus:ring-gray-300 ${errors.unit_price ? "border-red-500" : "border-gray-200"}`}
+            className={`border rounded-lg pl-8 pr-4 py-3 text-sm w-full outline-none focus:ring-2 focus:ring-gray-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.unit_price ? "border-red-500" : "border-gray-200"}`}
           />
         </div>
       </div>
@@ -195,19 +200,21 @@ function EntryFormFields({
           type="number"
           min="1"
           value={form.quantity}
+          disabled={descriptionOnly}
           onChange={(e) => { onChange({ ...form, quantity: e.target.value }); onClearError("quantity"); }}
           placeholder="0"
-          className={`border rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 ${errors.quantity ? "border-red-500" : "border-gray-200"}`}
+          className={`border rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.quantity ? "border-red-500" : "border-gray-200"}`}
         />
       </div>
 
       {form.category === "expense" && (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-gray-500">Receipt <span className="text-gray-400">(optional)</span></label>
-          <label className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors">
+          <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-3 transition-colors ${descriptionOnly ? "bg-gray-100 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"}`}>
             <input
               type="file"
               accept="image/*,.pdf"
+              disabled={descriptionOnly}
               className="hidden"
               onChange={(e) => onChange({ ...form, receipt: e.target.files?.[0] ?? null })}
             />
@@ -344,6 +351,7 @@ export default function AddEntrySheet(props: Props) {
               onChange={(f) => (props as EditModeProps).setForm(f)}
               errors={(props as EditModeProps).errors}
               onClearError={(key) => (props as EditModeProps).setErrors((p) => ({ ...p, [key]: false }))}
+              descriptionOnly
             />
           ) : (
             <>
