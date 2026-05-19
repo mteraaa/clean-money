@@ -1,266 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CalendarIcon, Plus } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { Plus } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import EntryFormFields from "./EntryFormFields";
+import { emptyForm, type FormState } from "./entryFormTypes";
 
-export const INCOME_DESCRIPTIONS = [
-  "Membership Fee",
-  "Donations",
-  "Fines",
-  "Collectibles",
-  "Special Projects/Fund Raising",
-  "Others",
-];
-export const EXPENSE_DESCRIPTIONS = ["Special Projects/Fund Raising", "Reimbursement", "Others"];
-
-export type FormState = {
-  date: string;
-  description_preset: string;
-  description_other: string;
-  payee: string;
-  category: "income" | "expense";
-  unit_price: string;
-  quantity: string;
-  receipt?: File | null;
-  receipt_number?: string;
-};
-
-export const emptyForm: FormState = {
-  date: "",
-  description_preset: "",
-  description_other: "",
-  payee: "",
-  category: "expense",
-  unit_price: "",
-  quantity: "",
-  receipt: null,
-  receipt_number: "",
-};
-
-function formatPeso(amount: number) {
-  return (
-    "₱" +
-    amount.toLocaleString("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  );
-}
-
-function EntryFormFields({
-  index,
-  baseControlNumber,
-  form,
-  onChange,
-  errors,
-  onClearError,
-  onRemove,
-  descriptionOnly = false,
-}: {
-  index: number;
-  baseControlNumber: number;
-  form: FormState;
-  onChange: (form: FormState) => void;
-  errors: Record<string, boolean>;
-  onClearError: (key: string) => void;
-  onRemove?: () => void;
-  descriptionOnly?: boolean;
-}) {
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const isReimbursement = form.category === "expense" && form.description_preset === "Reimbursement";
-  const needsExtra =
-    form.description_preset === "Others" ||
-    (form.category === "expense" && form.description_preset === "Special Projects/Fund Raising") ||
-    isReimbursement;
-  const total = (parseFloat(form.unit_price) || 0) * (parseInt(form.quantity) || 0);
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Control Number</label>
-        <input
-          disabled
-          value={baseControlNumber + index}
-          className="border border-gray-200 rounded-lg px-4 py-3 bg-gray-100 text-gray-500 text-sm"
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Category</label>
-        <select
-          value={form.category}
-          disabled={descriptionOnly}
-          onChange={(e) => onChange({ ...form, category: e.target.value as "income" | "expense", description_preset: "", description_other: "", payee: "" })}
-          className={`border rounded-lg px-4 pr-10 py-3 text-sm bg-white outline-none focus:ring-2 focus:ring-gray-300 font-medium disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.category && !form.category ? "border-red-500" : form.category === "income" ? "border-green-500" : form.category === "expense" ? "border-red-500" : "border-gray-200"} ${form.category === "income" ? "text-green-600" : form.category === "expense" ? "text-red-500" : "text-gray-400"}`}
-        >
-          <option value="" disabled>Select category</option>
-          <option value="income">Income</option>
-          <option value="expense">Expense</option>
-        </select>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Description</label>
-        <select
-          value={form.description_preset}
-          disabled={!form.category || descriptionOnly}
-          onChange={(e) => {
-            onChange({ ...form, description_preset: e.target.value, description_other: "", payee: "" });
-            onClearError("description");
-          }}
-          className={`border rounded-lg px-4 pr-10 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${errors.description && !form.description_preset ? "border-red-500" : "border-gray-200"}`}
-        >
-          <option value="">Select description</option>
-          {(form.category === "income" ? INCOME_DESCRIPTIONS : EXPENSE_DESCRIPTIONS).map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-        {needsExtra && (
-          <input
-            type="text"
-            value={form.description_other}
-            onChange={(e) => {
-              onChange({ ...form, description_other: e.target.value });
-              onClearError("description");
-            }}
-            placeholder={form.description_preset === "Others" ? "Specify description" : "Specify project name"}
-            className={`border rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 mt-1 ${errors.description && !form.description_other ? "border-red-500" : "border-gray-200"}`}
-          />
-        )}
-        {isReimbursement && (
-          <input
-            type="text"
-            value={form.payee}
-            disabled={descriptionOnly}
-            onChange={(e) => onChange({ ...form, payee: e.target.value })}
-            placeholder="Payee"
-            className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 mt-1 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-          />
-        )}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Date</label>
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
-            <button disabled={descriptionOnly} className={`flex items-center justify-between border rounded-lg px-4 py-3 text-sm outline-none text-left disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.date ? "border-red-500" : "border-gray-200"}`}>
-              <span className={form.date ? "text-gray-900" : "text-gray-400"}>
-                {form.date
-                  ? new Date(form.date).toLocaleDateString("en-PH", { month: "short", day: "2-digit", year: "numeric" })
-                  : "Select date"}
-              </span>
-              <CalendarIcon className="w-4 h-4 text-gray-400" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={form.date ? new Date(form.date) : undefined}
-              onSelect={(date) => {
-                if (date) {
-                  const y = date.getFullYear();
-                  const m = String(date.getMonth() + 1).padStart(2, "0");
-                  const d = String(date.getDate()).padStart(2, "0");
-                  onChange({ ...form, date: `${y}-${m}-${d}` });
-                  setCalendarOpen(false);
-                }
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Unit Price</label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">₱</span>
-          <input
-            type="number"
-            min="0"
-            value={form.unit_price}
-            disabled={descriptionOnly}
-            onChange={(e) => { onChange({ ...form, unit_price: e.target.value }); onClearError("unit_price"); }}
-            placeholder="0.00"
-            className={`border rounded-lg pl-8 pr-4 py-3 text-sm w-full outline-none focus:ring-2 focus:ring-gray-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.unit_price ? "border-red-500" : "border-gray-200"}`}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-gray-500">Quantity</label>
-        <input
-          type="number"
-          min="1"
-          value={form.quantity}
-          disabled={descriptionOnly}
-          onChange={(e) => { onChange({ ...form, quantity: e.target.value }); onClearError("quantity"); }}
-          placeholder="0"
-          className={`border rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${errors.quantity ? "border-red-500" : "border-gray-200"}`}
-        />
-      </div>
-
-      {form.category === "expense" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-gray-500">Receipt <span className="text-gray-400">(optional)</span></label>
-          <label className={`flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-4 py-3 transition-colors ${descriptionOnly ? "bg-gray-100 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"}`}>
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              disabled={descriptionOnly}
-              className="hidden"
-              onChange={(e) => onChange({ ...form, receipt: e.target.files?.[0] ?? null })}
-            />
-            <span className="text-sm text-gray-400 truncate">
-              {form.receipt ? form.receipt.name : "Click to upload receipt…"}
-            </span>
-          </label>
-          {form.receipt && (
-            <>
-              <input
-                type="text"
-                value={form.receipt_number ?? ""}
-                onChange={(e) => onChange({ ...form, receipt_number: e.target.value })}
-                placeholder="Receipt number"
-                className="border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-300"
-              />
-              <button
-                type="button"
-                onClick={() => onChange({ ...form, receipt: null, receipt_number: "" })}
-                className="text-xs text-red-400 hover:text-red-600 text-left"
-              >
-                Remove receipt
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      <div className="flex items-end justify-between mt-2 pb-6">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm text-gray-500">Total</label>
-          <p className="text-3xl font-bold text-gray-900">{formatPeso(total)}</p>
-        </div>
-        {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-sm text-red-500 border border-red-500 rounded-lg px-4 py-2 hover:bg-red-50 transition-colors"
-          >
-            Remove
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+export { INCOME_DESCRIPTIONS, EXPENSE_DESCRIPTIONS, emptyForm, type FormState } from "./entryFormTypes";
 
 type CommonProps = {
   open: boolean;
@@ -308,22 +54,13 @@ export default function AddEntrySheet(props: Props) {
   }
 
   function handleSave() {
-    if (isEdit) {
-      (props as EditModeProps).onSubmit();
-      return;
-    }
+    if (isEdit) { (props as EditModeProps).onSubmit(); return; }
     const newErrors = forms.map((form) => {
       const needsExtra =
         form.description_preset === "Others" ||
         (form.category === "expense" && form.description_preset === "Special Projects/Fund Raising");
       const finalDescription = needsExtra ? form.description_other : form.description_preset;
-      return {
-        category: !form.category,
-        description: !finalDescription,
-        date: !form.date,
-        unit_price: !form.unit_price,
-        quantity: !form.quantity,
-      };
+      return { category: !form.category, description: !finalDescription, date: !form.date, unit_price: !form.unit_price, quantity: !form.quantity };
     });
     setFormsErrors(newErrors);
     if (newErrors.some((e) => Object.values(e).some(Boolean))) return;
@@ -359,27 +96,26 @@ export default function AddEntrySheet(props: Props) {
                 const incomesBefore = forms.slice(0, index).filter((f) => f.category === "income").length;
                 const expensesBefore = forms.slice(0, index).filter((f) => f.category === "expense").length;
                 const controlNum = !form.category ? 0
-                  : form.category === "income"
-                    ? nextControlNumbers.income + incomesBefore
-                    : nextControlNumbers.expense + expensesBefore;
+                  : form.category === "income" ? nextControlNumbers.income + incomesBefore
+                  : nextControlNumbers.expense + expensesBefore;
                 return (
-                <React.Fragment key={index}>
-                  {index > 0 && <hr className="border-gray-200 my-6" />}
-                  <div className="snap-start">
-                    <EntryFormFields
-                      index={0}
-                      baseControlNumber={controlNum}
-                      form={form}
-                      onChange={(f) => setForms((prev) => prev.map((pf, i) => i === index ? f : pf))}
-                      errors={formsErrors[index] || {}}
-                      onClearError={(key) => setFormsErrors((prev) => prev.map((e, i) => i === index ? { ...e, [key]: false } : e))}
-                      onRemove={forms.length > 1 ? () => {
-                        setForms((prev) => prev.filter((_, i) => i !== index));
-                        setFormsErrors((prev) => prev.filter((_, i) => i !== index));
-                      } : undefined}
-                    />
-                  </div>
-                </React.Fragment>
+                  <React.Fragment key={index}>
+                    {index > 0 && <hr className="border-gray-200 my-6" />}
+                    <div className="snap-start">
+                      <EntryFormFields
+                        index={0}
+                        baseControlNumber={controlNum}
+                        form={form}
+                        onChange={(f) => setForms((prev) => prev.map((pf, i) => i === index ? f : pf))}
+                        errors={formsErrors[index] || {}}
+                        onClearError={(key) => setFormsErrors((prev) => prev.map((e, i) => i === index ? { ...e, [key]: false } : e))}
+                        onRemove={forms.length > 1 ? () => {
+                          setForms((prev) => prev.filter((_, i) => i !== index));
+                          setFormsErrors((prev) => prev.filter((_, i) => i !== index));
+                        } : undefined}
+                      />
+                    </div>
+                  </React.Fragment>
                 );
               })}
             </>
