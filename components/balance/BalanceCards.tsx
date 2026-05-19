@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useBalanceActions } from "./balance/useBalanceActions";
-import TotalBalanceCard from "./balance/TotalBalanceCard";
-import CollectiblesCard from "./balance/CollectiblesCard";
-import CashOnHandCard from "./balance/CashOnHandCard";
-import CashOnBankCard from "./balance/CashOnBankCard";
-import FinesCard from "./balance/FinesCard";
-import CalculatorDialog from "./balance/CalculatorDialog";
-import FineEditDialog from "./balance/FineEditDialog";
+import { useBalanceActions } from "./useBalanceActions";
+import TotalBalanceCard from "./TotalBalanceCard";
+import CollectiblesCard from "./CollectiblesCard";
+import CashOnHandCard from "./CashOnHandCard";
+import CashOnBankCard from "./CashOnBankCard";
+import FinesCard from "./FinesCard";
+import CalculatorDialog from "./CalculatorDialog";
+import FineEditDialog from "./FineEditDialog";
 
 type Props = {
   cashOnBank: number;
@@ -24,19 +24,35 @@ type Props = {
 
 export default function BalanceCards({ isPublished = false, ...rest }: Props) {
   const {
-    visible, setVisible,
-    bank, hand, coll,
-    prevColl, prevBank,
-    bankAction, setBankAction,
-    calcOpen, calcInput, calcSaving,
-    openCalc, closeCalc,
-    handleUndoColl, handleUndoBank,
-    handleCalcKey, confirmCalc,
-    fineAmt, totalFineStudents,
-    fineEditOpen, fineAmtInput, fineTotalInput, fineSaving,
+    visible,
+    setVisible,
+    bank,
+    hand,
+    coll,
+    prevColl,
+    prevBank,
+    bankAction,
+    setBankAction,
+    calcOpen,
+    calcInput,
+    calcSaving,
+    openCalc,
+    closeCalc,
+    handleUndoColl,
+    handleUndoBank,
+    handleCalcKey,
+    confirmCalc,
+    fineAmt,
+    totalFineStudents,
+    fineEditOpen,
+    fineAmtInput,
+    fineTotalInput,
+    fineSaving,
     finesAdded,
-    openFineEdit, closeFineEdit,
-    setFineAmtInput, setFineTotalInput,
+    openFineEdit,
+    closeFineEdit,
+    setFineAmtInput,
+    setFineTotalInput,
     saveFineEdit,
     handleAddFineToCollectibles,
   } = useBalanceActions(rest);
@@ -44,11 +60,22 @@ export default function BalanceCards({ isPublished = false, ...rest }: Props) {
   useEffect(() => {
     if (!calcOpen) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); handleCalcKey(e.key); }
-      else if (e.key === ".") { e.preventDefault(); handleCalcKey("."); }
-      else if (e.key === "Backspace") { e.preventDefault(); handleCalcKey("⌫"); }
-      else if (e.key === "Enter") { e.preventDefault(); confirmCalc(); }
-      else if (e.key === "Escape") { e.preventDefault(); closeCalc(); }
+      if (e.key >= "0" && e.key <= "9") {
+        e.preventDefault();
+        handleCalcKey(e.key);
+      } else if (e.key === ".") {
+        e.preventDefault();
+        handleCalcKey(".");
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        handleCalcKey("⌫");
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        confirmCalc();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeCalc();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -108,7 +135,9 @@ export default function BalanceCards({ isPublished = false, ...rest }: Props) {
         calcInput={calcInput}
         calcSaving={calcSaving}
         onClose={closeCalc}
-        onBankActionChange={(action) => { setBankAction(action); }}
+        onBankActionChange={(action) => {
+          setBankAction(action);
+        }}
         onCalcKey={handleCalcKey}
         onConfirm={confirmCalc}
       />
