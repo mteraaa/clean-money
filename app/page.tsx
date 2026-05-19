@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createClient } from "@/utils/supabase/client";
 import {
   ChevronDown,
   ArrowDown,
@@ -9,7 +10,6 @@ import {
   ZoomOut,
   FileText,
 } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 
 type Campus = { campus_code: string; name: string };
 type Faculty = { faculty_code: string; name: string };
@@ -84,27 +84,22 @@ export default function Home() {
       return;
     }
     (async () => {
-      const supabase = createClient();
-      const query = supabase
-        .from("reports")
-        .select("id, summary_file_path, title")
-        .eq("semester_id", parseInt(selectedSemester));
       const isFaculty = selectedFaculty && selectedFaculty !== "__none__";
-      if (isFaculty) query.eq("faculty_code", selectedFaculty);
-      else query.eq("campus_code", selectedCampus).is("faculty_code", null);
-      const { data } = await query.maybeSingle();
-      if (!data?.summary_file_path) {
-        setReportUrl(null);
-        setReportTitle("No report found");
-        return;
-      }
       const params = new URLSearchParams({
         campus_code: selectedCampus,
         semester_id: selectedSemester,
       });
       if (isFaculty) params.set("faculty_code", selectedFaculty);
-      setReportUrl(`/api/public-pdf?${params.toString()}`);
-      setReportTitle(data.title ?? "Financial Report");
+
+      const res = await fetch(`/api/public-pdf?${params.toString()}`);
+      if (!res.ok) {
+        setReportUrl(null);
+        setReportTitle("No report found");
+        return;
+      }
+      const { signedUrl, title } = await res.json();
+      setReportUrl(signedUrl);
+      setReportTitle(title);
     })();
   }, [selectedCampus, selectedFaculty, selectedSemester]);
 
