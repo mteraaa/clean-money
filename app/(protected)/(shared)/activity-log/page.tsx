@@ -30,7 +30,7 @@ export default function ActivityLogPage() {
         .limit(200);
 
       if (userData.faculty_code) q = q.eq("faculty_code", userData.faculty_code);
-      else q = q.eq("campus_code", userData.campus_code);
+      else q = q.eq("campus_code", userData.campus_code).is("faculty_code", null);
 
       const { data } = await q;
       setLogs(data ?? []);
