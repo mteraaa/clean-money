@@ -57,7 +57,7 @@ export default function AppSidebar() {
   return (
     <Sidebar
       className="shadow-[4px_0px_10px_0px_rgba(74,85,104,0.2)] overflow-hidden relative z-20"
-      collapsible="none"
+      collapsible="offcanvas"
     >
       <SidebarHeader>
         <img
@@ -77,7 +77,7 @@ export default function AppSidebar() {
           </Link>
           <Link
             href="/archives"
-            className={`flex items-center gap-2${pathname === "/archives" ? " font-bold" : ""}`}
+            className={`flex items-center gap-2${pathname.startsWith("/archives") ? " font-bold" : ""}`}
           >
             <Archive className="w-4 h-4" />
             Archives
@@ -110,8 +110,8 @@ export default function AppSidebar() {
       </SidebarGroup>
       <SidebarFooter className="mt-auto mb-4 px-2">
         <Link
-          className={`font-inter text-sm px-2 py-1 hover:underline flex items-center gap-2${pathname === "/settings" ? " font-bold" : ""}`}
           href="/settings"
+          className={`flex items-center gap-2${pathname === "/settings" ? " font-bold" : ""}`}
         >
           <Settings className="w-4 h-4" />
           Settings
