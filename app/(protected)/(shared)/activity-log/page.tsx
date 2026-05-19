@@ -29,8 +29,8 @@ export default function ActivityLogPage() {
         .order("logged_at", { ascending: false })
         .limit(200);
 
-      if (userData.faculty_code) q.eq("faculty_code", userData.faculty_code);
-      else q.eq("campus_code", userData.campus_code);
+      if (userData.faculty_code) q = q.eq("faculty_code", userData.faculty_code);
+      else q = q.eq("campus_code", userData.campus_code);
 
       const { data } = await q;
       setLogs(data ?? []);
