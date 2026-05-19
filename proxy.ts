@@ -32,7 +32,7 @@ export const proxy = async (request: NextRequest) => {
   const { data: { user } } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublicRoute = pathname === "/login" || pathname === "/";
+  const isPublicRoute = pathname === "/login" || pathname === "/" || pathname === "/api/public-pdf";
 
   // Redirect unauthenticated users to /login
   if (!user && !isPublicRoute) {
