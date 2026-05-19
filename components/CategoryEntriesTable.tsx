@@ -111,6 +111,7 @@ export default function CategoryEntriesTable({
   onMutation,
   isPublished = false,
 }: Props) {
+  const [isLoading, setIsLoading] = useState(true);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [semesterId, setSemesterId] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -144,7 +145,7 @@ export default function CategoryEntriesTable({
   }
 
   useEffect(() => {
-    if (!facultyCode && !campusCode) return;
+    if (!facultyCode && !campusCode) { setIsLoading(false); return; }
     const supabase = createClient();
     (async () => {
       const { data: sem, error: semError } = await supabase
@@ -155,12 +156,14 @@ export default function CategoryEntriesTable({
 
       if (semError) {
         console.error("Semester error:", semError.message);
+        setIsLoading(false);
         return;
       }
-      if (!sem) return;
+      if (!sem) { setIsLoading(false); return; }
 
       setSemesterId(sem.id);
       await fetchEntries(supabase, sem.id);
+      setIsLoading(false);
     })();
   }, [facultyCode, campusCode, refreshKey]);
 
@@ -360,7 +363,8 @@ export default function CategoryEntriesTable({
           )}
         </div>
 
-        <div className="overflow-y-auto max-h-80">
+        {!isLoading && (
+        <div className="overflow-y-auto max-h-80 animate-fade-in-up">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-[#E5E7EB] text-gray-700 font-semibold text-left">
@@ -469,6 +473,7 @@ export default function CategoryEntriesTable({
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       <AddEntrySheet
