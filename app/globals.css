@@ -23,7 +23,7 @@
 
 @layer utilities {
   .animate-fade-in-up {
-    animation: fade-in-up 0.7s ease both;
+    animation: fade-in-up 0.7s ease backwards;
   }
 }
 

@@ -51,7 +51,7 @@ export function useDashboardData() {
         .select("id, semester_name, academic_years(year_label)")
         .eq("is_active", true)
         .single();
-      if (!sem) { setIsSemesterEnded(true); return; }
+      if (!sem) { setIsSemesterEnded(true); setIsLoading(false); return; }
 
       setIsSemesterEnded(false);
       setSemesterId(sem.id);

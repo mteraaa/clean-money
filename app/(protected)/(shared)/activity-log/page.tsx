@@ -23,14 +23,14 @@ export default function ActivityLogPage() {
         .single();
       if (!userData) { setIsLoading(false); return; }
 
-      const q = supabase
+      let q = supabase
         .from("activity_logs")
         .select("id, description, logged_at")
         .order("logged_at", { ascending: false })
         .limit(200);
 
-      if (userData.faculty_code) q.eq("faculty_code", userData.faculty_code);
-      else q.eq("campus_code", userData.campus_code);
+      if (userData.faculty_code) q = q.eq("faculty_code", userData.faculty_code);
+      else q = q.eq("campus_code", userData.campus_code).is("faculty_code", null);
 
       const { data } = await q;
       setLogs(data ?? []);

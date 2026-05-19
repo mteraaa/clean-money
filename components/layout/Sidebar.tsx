@@ -110,8 +110,8 @@ export default function AppSidebar() {
       </SidebarGroup>
       <SidebarFooter className="mt-auto mb-4 px-2">
         <Link
-          className={`font-inter text-sm px-2 py-1 hover:underline flex items-center gap-2${pathname === "/settings" ? " font-bold" : ""}`}
           href="/settings"
+          className={`flex items-center gap-2${pathname === "/settings" ? " font-bold" : ""}`}
         >
           <Settings className="w-4 h-4" />
           Settings

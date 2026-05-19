@@ -1,164 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import fs from "fs";
-import path from "path";
-
-// ---------------------------------------------------------------------------
-// Coordinate constants — PDF points, origin bottom-left, A4 595×842
-// ---------------------------------------------------------------------------
-const SZ = 9;
-const COLOR = rgb(0, 0, 0);
-const X_RIGHT = 468;
-const X_INDENT = 240;
-const X_BREAKDOWN = 343;
-const X_OTHERS_LABEL = 170;
-const Y = {
-  semester: 734,
-  orgName: 708,
-  beginBal: 670,
-  beginHand: 657,
-  beginBank: 644,
-  membership: 617,
-  donations: 604,
-  fines: 591,
-  collections: 578,
-  others: [565, 552, 539, 525] as const,
-  spRevenues: 499,
-  collectiblesB: 472,
-  totalFunds: 459,
-  lessExpenses: 446,
-  netBalance: 433,
-  bdHand: 406,
-  bdBank: 393,
-  bdCollectibles: 380,
-  // Lower section — "Deposited with" and signatures
-  receiver: 340,
-  designation: 340,
-  dateDeposited: 327,
-  amountWords: 327,
-  amountNum: 327,
-  treasurer: 266,
-  auditDay: 213,
-  auditMonth: 213,
-  auditYear: 213,
-  auditor: 173,
-};
-
-// X positions for lower section
-const X_RECEIVER = 226;
-const X_DESIGNATION = 422;
-const X_DATE_DEP = 152;
-const X_AMT_WORDS = 257;
-const X_AMT_NUM = 467;
-const X_TREASURER = 394;
-const X_AUDIT_DAY = 194;
-const X_AUDIT_MONTH = 278;
-const X_AUDIT_YEAR = 354;
-const X_AUDITOR = 394;
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-function fmt(n: number) {
-  return n.toLocaleString("en-PH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function numberToWords(num: number): string {
-  if (num === 0) return "Zero Pesos";
-  const ones = [
-    "",
-    "One",
-    "Two",
-    "Three",
-    "Four",
-    "Five",
-    "Six",
-    "Seven",
-    "Eight",
-    "Nine",
-    "Ten",
-    "Eleven",
-    "Twelve",
-    "Thirteen",
-    "Fourteen",
-    "Fifteen",
-    "Sixteen",
-    "Seventeen",
-    "Eighteen",
-    "Nineteen",
-  ];
-  const tensArr = [
-    "",
-    "",
-    "Twenty",
-    "Thirty",
-    "Forty",
-    "Fifty",
-    "Sixty",
-    "Seventy",
-    "Eighty",
-    "Ninety",
-  ];
-  function w(n: number): string {
-    if (n < 20) return ones[n];
-    if (n < 100)
-      return tensArr[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
-    if (n < 1000)
-      return (
-        ones[Math.floor(n / 100)] +
-        " Hundred" +
-        (n % 100 ? " " + w(n % 100) : "")
-      );
-    if (n < 1_000_000)
-      return (
-        w(Math.floor(n / 1000)) +
-        " Thousand" +
-        (n % 1000 ? " " + w(n % 1000) : "")
-      );
-    return (
-      w(Math.floor(n / 1_000_000)) +
-      " Million" +
-      (n % 1_000_000 ? " " + w(n % 1_000_000) : "")
-    );
-  }
-  const intPart = Math.floor(Math.abs(num));
-  const cents = Math.round((Math.abs(num) - intPart) * 100);
-  let result = w(intPart) + " Pesos";
-  if (cents > 0) result += " and " + w(cents) + " Centavos";
-  return result;
-}
+import { buildReportPdf, type ReportData, type CertFields } from "./pdf-helpers";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const qReceiver = searchParams.get("receiver") ?? "";
-  const qDesignation = searchParams.get("designation") ?? "";
-  const qDateDep = searchParams.get("dateDeposited") ?? "";
-  const qAmount = searchParams.get("amount") ?? "";
-  const qTreasurer = searchParams.get("treasurer") ?? "";
-  const qAuditDate = searchParams.get("auditDate") ?? "";
-  const qAuditor = searchParams.get("auditor") ?? "";
+  const cert: CertFields = {
+    receiver: searchParams.get("receiver") ?? "",
+    designation: searchParams.get("designation") ?? "",
+    dateDeposited: searchParams.get("dateDeposited") ?? "",
+    amount: searchParams.get("amount") ?? "",
+    treasurer: searchParams.get("treasurer") ?? "",
+    auditDate: searchParams.get("auditDate") ?? "",
+    auditor: searchParams.get("auditor") ?? "",
+  };
 
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
   const { data: userData } = await supabase
@@ -170,7 +27,6 @@ export async function GET(request: Request) {
 
   const { faculty_code, campus_code } = userData;
 
-  // Active semester
   const { data: sem } = await supabase
     .from("semesters")
     .select("id, semester_name, academic_years(year_label)")
@@ -178,17 +34,13 @@ export async function GET(request: Request) {
     .single();
   if (!sem) return new NextResponse("No active semester", { status: 404 });
 
-  // Balance card
   let balQ = supabase
     .from("balance_cards")
-    .select(
-      "initial_account_balance, initial_cash_on_hand, initial_cash_on_bank, cash_on_hand, cash_on_bank, collectibles",
-    );
+    .select("initial_account_balance, initial_cash_on_hand, initial_cash_on_bank, cash_on_hand, cash_on_bank, collectibles");
   if (faculty_code) balQ = balQ.eq("faculty_code", faculty_code);
   else balQ = balQ.eq("campus_code", campus_code);
   const { data: bal } = await balQ.single();
 
-  // Income entries
   let incQ = supabase
     .from("entries")
     .select("description, total_price")
@@ -198,7 +50,6 @@ export async function GET(request: Request) {
   else incQ = incQ.eq("campus_code", campus_code);
   const { data: incomeEntries } = await incQ;
 
-  // Expense entries
   let expQ = supabase
     .from("entries")
     .select("total_price")
@@ -208,30 +59,16 @@ export async function GET(request: Request) {
   else expQ = expQ.eq("campus_code", campus_code);
   const { data: expenseEntries } = await expQ;
 
-  // Org name
   let orgName = "";
   if (faculty_code) {
-    const { data: fac } = await supabase
-      .from("faculty_seb")
-      .select("name")
-      .eq("faculty_code", faculty_code)
-      .single();
+    const { data: fac } = await supabase.from("faculty_seb").select("name").eq("faculty_code", faculty_code).single();
     if (fac) orgName = `${fac.name} - Student Election Board`;
   } else {
-    const { data: cam } = await supabase
-      .from("campus_seb")
-      .select("name")
-      .eq("campus_code", campus_code!)
-      .single();
+    const { data: cam } = await supabase.from("campus_seb").select("name").eq("campus_code", campus_code!).single();
     if (cam) orgName = `${cam.name} - Student Election Board`;
   }
 
-  // Aggregate income
-  let membershipFee = 0,
-    donations = 0,
-    fines = 0,
-    collectiblesIncome = 0,
-    spRevenues = 0;
+  let membershipFee = 0, donations = 0, fines = 0, collectiblesIncome = 0, spRevenues = 0;
   const othersMap: Record<string, number> = {};
   for (const e of incomeEntries ?? []) {
     const t = Number(e.total_price) || 0;
@@ -242,144 +79,31 @@ export async function GET(request: Request) {
     else if (e.description === "Special Projects/Fund Raising") spRevenues += t;
     else othersMap[e.description] = (othersMap[e.description] || 0) + t;
   }
-  const others = Object.entries(othersMap).map(([label, amount]) => ({
-    label,
-    amount,
-  }));
-  const totalExpenses = (expenseEntries ?? []).reduce(
-    (s, e) => s + (Number(e.total_price) || 0),
-    0,
-  );
-
+  const others = Object.entries(othersMap).map(([label, amount]) => ({ label, amount }));
+  const totalExpenses = (expenseEntries ?? []).reduce((s, e) => s + (Number(e.total_price) || 0), 0);
   const initialBal = Number(bal?.initial_account_balance) || 0;
   const collectiblesB = Number(bal?.collectibles) || 0;
-  const totalContributions =
-    membershipFee +
-    donations +
-    fines +
-    collectiblesIncome +
-    others.reduce((s, o) => s + o.amount, 0) +
-    spRevenues;
-  const totalFunds = initialBal + totalContributions + collectiblesB;
-  const netFundBalance = totalFunds - totalExpenses;
+  const totalFunds = initialBal + membershipFee + donations + fines + collectiblesIncome
+    + others.reduce((s, o) => s + o.amount, 0) + spRevenues + collectiblesB;
 
-  // Parse semester / year
-  const semName = (sem.semester_name ?? "")
-    .replace(/\s*semester\s*/i, "")
-    .trim();
-  const yearLabel =
-    (sem.academic_years as { year_label?: string } | null)?.year_label ?? "";
-  const [y1, y2] = yearLabel.split("-");
+  const semName = (sem.semester_name ?? "").replace(/\s*semester\s*/i, "").trim();
+  const yearLabel = (sem.academic_years as { year_label?: string } | null)?.year_label ?? "";
+  const [y1 = "", y2 = ""] = yearLabel.split("-");
 
-  // Load template
-  const templatePath = path.join(
-    process.cwd(),
-    "public",
-    "report-template.pdf",
-  );
-  const templateBytes = fs.readFileSync(templatePath);
+  const data: ReportData = {
+    semName, y1, y2, orgName,
+    initialBal,
+    initCashHand: Number(bal?.initial_cash_on_hand) || 0,
+    initCashBank: Number(bal?.initial_cash_on_bank) || 0,
+    membershipFee, donations, fines, collectiblesIncome, others, spRevenues,
+    collectiblesB, totalFunds, totalExpenses,
+    netFundBalance: totalFunds - totalExpenses,
+    cashOnHand: Number(bal?.cash_on_hand) || 0,
+    cashOnBank: Number(bal?.cash_on_bank) || 0,
+  };
 
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const page = pdfDoc.getPages()[0];
-
-  function draw(text: string, x: number, y: number, size = SZ) {
-    page.drawText(text, { x, y, size, font, color: COLOR });
-  }
-
-  function fitSize(text: string, maxWidth: number, maxSize: number): number {
-    const w = font.widthOfTextAtSize(text, maxSize);
-    return w <= maxWidth ? maxSize : (maxWidth / w) * maxSize;
-  }
-
-  // ── Financial data ──
-  draw(semName, 248, Y.semester);
-  draw((y1 ?? "").slice(-2), 361, Y.semester);
-  draw((y2 ?? "").slice(-2), 406, Y.semester);
-
-  const orgW = font.widthOfTextAtSize(orgName, SZ);
-  draw(orgName, (618 - orgW) / 2, Y.orgName);
-
-  draw(fmt(initialBal), X_RIGHT, Y.beginBal);
-  draw(fmt(Number(bal?.initial_cash_on_hand) || 0), X_INDENT, Y.beginHand);
-  draw(fmt(Number(bal?.initial_cash_on_bank) || 0), X_INDENT, Y.beginBank);
-
-  draw(fmt(membershipFee), X_RIGHT, Y.membership);
-  draw(fmt(donations), X_RIGHT, Y.donations);
-  draw(fmt(fines), X_RIGHT, Y.fines);
-  draw(fmt(collectiblesIncome), X_RIGHT, Y.collections);
-
-  others.slice(0, 4).forEach(({ label, amount }, i) => {
-    draw(label, X_OTHERS_LABEL, Y.others[i]);
-    draw(fmt(amount), X_RIGHT, Y.others[i]);
-  });
-
-  draw(fmt(spRevenues), X_INDENT, Y.spRevenues);
-  draw(fmt(collectiblesB), X_RIGHT, Y.collectiblesB);
-  draw(fmt(totalFunds), X_RIGHT, Y.totalFunds);
-  draw(fmt(totalExpenses), X_RIGHT, Y.lessExpenses);
-  draw(fmt(netFundBalance), X_RIGHT, Y.netBalance);
-
-  draw(fmt(Number(bal?.cash_on_hand) || 0), X_BREAKDOWN, Y.bdHand);
-  draw(fmt(Number(bal?.cash_on_bank) || 0), X_BREAKDOWN, Y.bdBank);
-  draw(fmt(collectiblesB), X_BREAKDOWN, Y.bdCollectibles);
-
-  // ── Lower section — certification fields ──
-  if (qReceiver)
-    draw(
-      qReceiver,
-      X_RECEIVER,
-      Y.receiver,
-      fitSize(qReceiver, X_DESIGNATION - X_RECEIVER - 48, 9),
-    );
-  if (qDesignation)
-    draw(
-      qDesignation,
-      X_DESIGNATION,
-      Y.designation,
-      fitSize(qDesignation, 559 - X_DESIGNATION - 5, 9),
-    );
-
-  // Date deposited: format YYYY-MM-DD → Month DD, YYYY
-  if (qDateDep) {
-    const [dy, dm, dd] = qDateDep.split("-");
-    const depFormatted = `${MONTHS[parseInt(dm) - 1] ?? ""} ${parseInt(dd)}, ${dy}`;
-    draw(depFormatted, X_DATE_DEP, Y.dateDeposited);
-  }
-
-  // Amount: words on the long blank, number in (P___)
-  if (qAmount) {
-    const amtNum = parseFloat(qAmount);
-    if (!isNaN(amtNum)) {
-      const words = numberToWords(amtNum);
-      draw(
-        words,
-        X_AMT_WORDS,
-        Y.amountWords,
-        Math.max(6, fitSize(words, 155, 11)),
-      );
-      draw(fmt(amtNum), X_AMT_NUM, Y.amountNum);
-    }
-  }
-
-  if (qTreasurer) draw(qTreasurer, X_TREASURER, Y.treasurer);
-
-  // Audit date: split into day, month name, 2-digit year
-  if (qAuditDate) {
-    const [ay, am, ad] = qAuditDate.split("-");
-    draw(String(parseInt(ad)), X_AUDIT_DAY, Y.auditDay);
-    draw(MONTHS[parseInt(am) - 1] ?? "", X_AUDIT_MONTH, Y.auditMonth);
-    draw(ay.slice(-2), X_AUDIT_YEAR, Y.auditYear);
-  }
-
-  if (qAuditor) draw(qAuditor, X_AUDITOR, Y.auditor);
-
-  const pdfBytes = await pdfDoc.save();
-
+  const pdfBytes = await buildReportPdf(data, cert);
   return new NextResponse(Buffer.from(pdfBytes), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline",
-    },
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline" },
   });
 }

@@ -1,4 +1,5 @@
 import { fmt, fmtDate } from "./pdf-helpers";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const PRESET_ORDER = ["Others", "Special Projects/Fund Raising", "Reimbursement"] as const;
 export type Preset = (typeof PRESET_ORDER)[number];
@@ -50,4 +51,43 @@ export function groupEntries(entries: ExpEntry[]) {
   ]);
   for (const e of entries) groups.get(getPreset(e.description ?? ""))!.push(e);
   return groups;
+}
+
+export async function fetchOrgData(supabase: SupabaseClient, userId: string) {
+  const { data: userData } = await supabase
+    .from("users")
+    .select("faculty_code, campus_code")
+    .eq("auth_id", userId)
+    .single();
+  if (!userData) return null;
+  const { faculty_code, campus_code } = userData;
+  let facultyName = "";
+  if (faculty_code) {
+    const { data: fac } = await supabase.from("faculty_seb").select("name").eq("faculty_code", faculty_code).single();
+    facultyName = fac?.name ?? "";
+  } else {
+    const { data: cam } = await supabase.from("campus_seb").select("name").eq("campus_code", campus_code!).single();
+    facultyName = cam?.name ?? "";
+  }
+  return { faculty_code, campus_code, facultyName };
+}
+
+export async function fetchExpenseEntries(
+  supabase: SupabaseClient,
+  allIds: string[],
+  semId: string,
+  faculty_code: string | null,
+  campus_code: string | null,
+): Promise<Map<string, ExpEntry>> {
+  let q = supabase
+    .from("entries")
+    .select("id, entry_date, control_number, receipt_number, description, unit_price, quantity, total_price")
+    .in("id", allIds)
+    .eq("semester_id", semId)
+    .eq("category", "expense")
+    .order("entry_date", { ascending: true });
+  if (faculty_code) q = q.eq("faculty_code", faculty_code);
+  else q = q.eq("campus_code", campus_code!);
+  const { data } = await q;
+  return new Map((data ?? []).map((e) => [String(e.id), e as ExpEntry]));
 }

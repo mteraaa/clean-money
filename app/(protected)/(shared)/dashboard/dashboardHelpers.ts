@@ -76,9 +76,9 @@ export async function resolvePublishedReport(
   semId: number,
   userData: UserData,
 ): Promise<PublishedReport | null> {
-  const q = supabase.from("reports").select("id, file_path").eq("semester_id", semId);
-  if (userData.faculty_code) q.eq("faculty_code", userData.faculty_code);
-  else q.eq("campus_code", userData.campus_code);
+  let q = supabase.from("reports").select("id, file_path").eq("semester_id", semId);
+  if (userData.faculty_code) q = q.eq("faculty_code", userData.faculty_code);
+  else q = q.eq("campus_code", userData.campus_code);
   const { data } = await q.maybeSingle();
   if (!data) return null;
   return {
