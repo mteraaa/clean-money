@@ -96,9 +96,9 @@ export function usePublishReport({ certForm, attachABPdfSrc, attachCPdfSrc, onPu
       await saveToArchives(attachABPdfSrc, "Attachment A&B", pdfsBasePath);
       await saveToArchives(attachCPdfSrc, "Attachment C", pdfsBasePath);
 
-      const existingQ = supabase.from("reports").select("id").eq("semester_id", semId);
-      if (facultyCode) existingQ.eq("faculty_code", facultyCode);
-      else existingQ.eq("campus_code", campusCode);
+      let existingQ = supabase.from("reports").select("id").eq("semester_id", semId);
+      if (facultyCode) existingQ = existingQ.eq("faculty_code", facultyCode);
+      else existingQ = existingQ.eq("campus_code", campusCode);
       const { data: existing } = await existingQ.maybeSingle();
 
       if (existing) {
