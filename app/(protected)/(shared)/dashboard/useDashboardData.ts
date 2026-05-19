@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import type { Balance, PublishedReport, SemesterMeta } from "./types";
+import {
+  resolveUserName,
+  resolveBalance,
+  resolveControlNumbers,
+  resolvePublishedReport,
+} from "./dashboardHelpers";
 
 export function useDashboardData() {
   const [isLoading, setIsLoading] = useState(true);
@@ -32,45 +38,13 @@ export function useDashboardData() {
         .single();
       if (!userData) return;
 
-      if (userData.faculty_code) {
-        const { data: facData } = await supabase
-          .from("faculty_seb")
-          .select("name")
-          .eq("faculty_code", userData.faculty_code)
-          .single();
-        setUserName(facData?.name ?? "");
-      } else if (userData.campus_code) {
-        const { data: camData } = await supabase
-          .from("campus_seb")
-          .select("name")
-          .eq("campus_code", userData.campus_code)
-          .single();
-        setUserName(camData?.name ?? "");
-      }
-
-      let balanceQuery = supabase
-        .from("balance_cards")
-        .select("cash_on_bank, cash_on_hand, collectibles, fine_amount, total_students_with_fines");
-      if (userData.faculty_code) {
-        balanceQuery = balanceQuery.eq("faculty_code", userData.faculty_code);
-      } else {
-        // campus_code is set on FC rows too, so filter faculty_code IS NULL
-        // to avoid picking up an FC balance row when the campus row is missing
-        balanceQuery = balanceQuery
-          .eq("campus_code", userData.campus_code)
-          .is("faculty_code", null);
-      }
-      const { data: balanceData } = await balanceQuery.maybeSingle();
-      setHasBalanceRow(!!balanceData);
-      setBalance({
-        cash_on_bank: balanceData?.cash_on_bank ?? 0,
-        cash_on_hand: balanceData?.cash_on_hand ?? 0,
-        collectibles: balanceData?.collectibles ?? 0,
-        fine_amount: balanceData?.fine_amount ?? 0,
-        total_students_with_fines: balanceData?.total_students_with_fines ?? 0,
-        faculty_code: userData.faculty_code,
-        campus_code: userData.campus_code,
-      });
+      const [name, { balance: bal, hasBalanceRow: hasBal }] = await Promise.all([
+        resolveUserName(supabase, userData),
+        resolveBalance(supabase, userData),
+      ]);
+      setUserName(name);
+      setHasBalanceRow(hasBal);
+      setBalance(bal);
 
       const { data: sem } = await supabase
         .from("semesters")
@@ -88,37 +62,16 @@ export function useDashboardData() {
       setSemesterMeta({ name: sem.semester_name ?? "", yearLabel });
 
       const scope = userData.faculty_code
-        ? { col: "faculty_code", val: userData.faculty_code }
-        : { col: "campus_code", val: userData.campus_code };
+        ? { col: "faculty_code" as const, val: userData.faculty_code }
+        : { col: "campus_code" as const, val: userData.campus_code! };
 
-      const [
-        { count: incomeCount },
-        { count: expenseCount },
-        { data: finesData },
-      ] = await Promise.all([
-        supabase.from("entries").select("id", { count: "exact", head: true })
-          .eq("semester_id", sem.id).eq("category", "income").eq(scope.col, scope.val),
-        supabase.from("entries").select("id", { count: "exact", head: true })
-          .eq("semester_id", sem.id).eq("category", "expense").eq(scope.col, scope.val),
-        supabase.from("entries").select("quantity")
-          .eq("semester_id", sem.id).eq("category", "income").eq("description", "Fines")
-          .eq("is_deleted", false).eq(scope.col, scope.val),
+      const [{ nextControlNumbers: ctrl, fineStudentsPaid: fines }, report] = await Promise.all([
+        resolveControlNumbers(supabase, sem.id, scope),
+        resolvePublishedReport(supabase, sem.id, userData),
       ]);
-      setNextControlNumbers({ income: (incomeCount ?? 0) + 1, expense: (expenseCount ?? 0) + 1 });
-      const paid = (finesData ?? []).reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
-      setFineStudentsPaid(paid);
-
-      const reportQ = supabase.from("reports").select("id, file_path").eq("semester_id", sem.id);
-      if (userData.faculty_code) reportQ.eq("faculty_code", userData.faculty_code);
-      else reportQ.eq("campus_code", userData.campus_code);
-      const { data: existingReport } = await reportQ.maybeSingle();
-      if (existingReport) {
-        setPublishedReport({
-          id: existingReport.id,
-          file_path: existingReport.file_path,
-          bucket: userData.faculty_code ? "Faculties" : "Campus SEB",
-        });
-      }
+      setNextControlNumbers(ctrl);
+      setFineStudentsPaid(fines);
+      if (report) setPublishedReport(report);
 
       setIsLoading(false);
     })();
@@ -127,14 +80,14 @@ export function useDashboardData() {
   async function refreshBalance() {
     if (!balance) return;
     const supabase = createClient();
-    let q = supabase.from("balance_cards").select("cash_on_bank, cash_on_hand, collectibles, fine_amount, total_students_with_fines");
+    let q = supabase.from("balance_cards")
+      .select("cash_on_bank, cash_on_hand, collectibles, fine_amount, total_students_with_fines");
     if (balance.faculty_code) q = q.eq("faculty_code", balance.faculty_code);
     else q = q.eq("campus_code", balance.campus_code).is("faculty_code", null);
     const { data, error } = await q.single();
     if (error) console.error("Balance fetch error:", error.message);
     if (data) setBalance((prev) => (prev ? { ...prev, ...data } : prev));
 
-    // Re-fetch fineStudentsPaid from entries
     const scope = balance.faculty_code
       ? { col: "faculty_code" as const, val: balance.faculty_code }
       : { col: "campus_code" as const, val: balance.campus_code! };
@@ -146,7 +99,6 @@ export function useDashboardData() {
       const paid = (finesData ?? []).reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
       setFineStudentsPaid(paid);
     }
-
     setBalanceKey((prev) => prev + 1);
   }
 
