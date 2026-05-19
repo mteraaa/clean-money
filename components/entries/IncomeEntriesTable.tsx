@@ -1,4 +1,4 @@
-import CategoryEntriesTable from "@/components/CategoryEntriesTable";
+import CategoryEntriesTable from "@/components/entries/CategoryEntriesTable";
 
 type Props = {
   facultyCode?: string | null;

@@ -5,8 +5,8 @@ import { X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { logActivity } from "@/utils/logActivity";
 import { toast } from "sonner";
-import AttachmentCTab from "@/components/AttachmentCTab";
-import AttachmentABTab from "@/components/AttachmentABTab";
+import AttachmentCTab from "@/components/reports/AttachmentCTab";
+import AttachmentABTab from "@/components/reports/AttachmentABTab";
 
 type PublishedReport = { id: number; file_path: string; bucket: string };
 

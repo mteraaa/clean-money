@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type React from "react";
 import { createClient } from "@/utils/supabase/client";
-import { type FormState } from "@/components/AddEntrySheet";
+import { type FormState } from "@/components/entries/AddEntrySheet";
 import { logActivity } from "@/utils/logActivity";
 import { toast } from "sonner";
 import type { Balance, SemesterMeta } from "./types";

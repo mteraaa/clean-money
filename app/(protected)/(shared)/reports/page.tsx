@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import PublishedFilesTable, {
   PublishedFile,
-} from "@/components/PublishedFilesTable";
+} from "@/components/reports/PublishedFilesTable";
 
 export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);

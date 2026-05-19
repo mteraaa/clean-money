@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import ActivityLogTable from "@/components/ActivityLogTable";
+import ActivityLogTable from "@/components/entries/ActivityLogTable";
 
 type Log = { id: number; description: string; logged_at: string };
 

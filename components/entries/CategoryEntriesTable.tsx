@@ -15,7 +15,7 @@ import AddEntrySheet, {
   emptyForm,
   FormState,
   INCOME_DESCRIPTIONS,
-} from "@/components/AddEntrySheet";
+} from "@/components/entries/AddEntrySheet";
 
 const INCOME_NO_SUFFIX = [
   "Membership Fee",

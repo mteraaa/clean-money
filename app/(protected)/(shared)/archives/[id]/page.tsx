@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import PublishedFilesTable, {
   PublishedFile,
-} from "@/components/PublishedFilesTable";
+} from "@/components/reports/PublishedFilesTable";
 import { ChevronLeft } from "lucide-react";
 
 export default function ReceiptFolderPage() {

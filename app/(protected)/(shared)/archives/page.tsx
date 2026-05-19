@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import PublishedFilesTable, {
   PublishedFile,
-} from "@/components/PublishedFilesTable";
+} from "@/components/reports/PublishedFilesTable";
 
 export default function ArchivesPage() {
   const router = useRouter();

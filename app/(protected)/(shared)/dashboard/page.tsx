@@ -1,16 +1,16 @@
 "use client";
 
 import { useDashboard } from "./useDashboard";
-import BalanceCards from "@/components/BalanceCards";
-import WelcomeCard from "@/components/WelcomeCard";
-import IncomeEntriesTable from "@/components/IncomeEntriesTable";
-import ExpenseEntriesTable from "@/components/ExpenseEntriesTable";
-import AddEntrySheet from "@/components/AddEntrySheet";
-import InitialBalanceSetupCard from "@/components/InitialBalanceSetupCard";
-import PDFViewerCard from "@/components/PDFViewerCard";
-import PublishDialog from "@/components/PublishDialog";
-import UnpublishDialog from "@/components/UnpublishDialog";
-import DashboardSkeleton from "@/components/DashboardSkeleton";
+import BalanceCards from "@/components/balance/BalanceCards";
+import WelcomeCard from "@/components/auth/WelcomeCard";
+import IncomeEntriesTable from "@/components/entries/IncomeEntriesTable";
+import ExpenseEntriesTable from "@/components/entries/ExpenseEntriesTable";
+import AddEntrySheet from "@/components/entries/AddEntrySheet";
+import InitialBalanceSetupCard from "@/components/balance/InitialBalanceSetupCard";
+import PDFViewerCard from "@/components/reports/PDFViewerCard";
+import PublishDialog from "@/components/reports/PublishDialog";
+import UnpublishDialog from "@/components/reports/UnpublishDialog";
+import DashboardSkeleton from "@/components/layout/DashboardSkeleton";
 
 export default function DashboardPage() {
   const {
