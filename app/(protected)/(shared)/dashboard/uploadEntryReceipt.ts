@@ -58,14 +58,31 @@ export async function uploadEntryReceipt(
     .from(bucket).upload(filePath, file, { contentType: file.type, upsert: false });
   if (uploadError) { console.error("Receipt upload error:", uploadError.message); return; }
 
+  const mimeType = file.type || `image/${ext}`;
+
+  const { data: entryReceipt, error: receiptError } = await supabase
+    .from("entry_receipts")
+    .insert({
+      entry_id: entryId,
+      original_name: file.name,
+      stored_name: storedName,
+      file_path: filePath,
+      file_size_bytes: file.size,
+      mime_type: mimeType,
+      uploaded_by: userId,
+    })
+    .select("id")
+    .single();
+  if (receiptError) { console.error("entry_receipts insert error:", receiptError.message); return; }
+
   await supabase.from("receipt_archive_files").insert({
     folder_id: folderData.id,
-    entry_receipt_id: entryId,
+    entry_receipt_id: entryReceipt.id,
     original_name: file.name,
     stored_name: storedName,
     file_path: filePath,
     file_size_bytes: file.size,
-    mime_type: file.type || `image/${ext}`,
+    mime_type: mimeType,
     added_by: userId,
     added_at: new Date().toISOString(),
   });
