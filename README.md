@@ -193,4 +193,4 @@ for the Visayas State University - Student Election Board.
 
 ### Important Links:
 
-- _Design Specs:_ [https://github.com/clean-money-docportal](https://github.com/...)
+- _Design Specs:_ [https://github.com/clean-money-docportal](https://github.com/mteraaa/clean-money-docportal)
