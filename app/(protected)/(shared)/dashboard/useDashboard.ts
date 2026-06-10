@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { logActivity } from "@/utils/logActivity";
 import { useDashboardData } from "./useDashboardData";
 import { useAddEntry } from "./useAddEntry";
 
@@ -52,6 +53,15 @@ export function useDashboard() {
     await supabase.storage.from(bucket).remove([file_path]);
     await supabase.from("reports").delete().eq("id", id);
     data.setPublishedReport(null);
+
+    logActivity({
+      description: `Unpublished financial report`,
+      action: "UNPUBLISH_REPORT", module: "REPORTS",
+      facultyCode: data.balance?.faculty_code ?? null,
+      campusCode: data.balance?.campus_code ?? null,
+      targetTable: "reports", targetId: id,
+    }).catch(() => {});
+
     setUnpublishOpen(false);
   }
 
